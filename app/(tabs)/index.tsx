@@ -13,8 +13,11 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from 'react-native';
+
+// 🚀 앱 버전 정의 (앞으로 코드를 수정하고 배포할 때마다 이 숫자를 '1.0.2', '1.0.3'으로 올려주시면 됩니다!)
+const CURRENT_APP_VERSION = '1.0.1';
 
 // 푸시 알림 동작 기본 설정
 Notifications.setNotificationHandler({
@@ -72,7 +75,6 @@ export default function HomeScreen() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentProfileId, setCurrentProfileId] = useState<string>('');
   
-  // 🌟 오늘 날짜로 기본 설정
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [meals, setMeals] = useState<MealItem[]>([]);
@@ -92,10 +94,11 @@ export default function HomeScreen() {
   // === 🔔 알림 설정 관련 상태 ===
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
   const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
-  const [selectedTime, setSelectedTime] = useState({ hour: 8, minute: 0 }); // 기본 오전 8시
+  const [selectedTime, setSelectedTime] = useState({ hour: 8, minute: 0 });
 
-  // 초기 데이터 로드
+  // 초기 데이터 로드 및 버전 감지
   useEffect(() => {
+    checkAppVersionAndUpdate();
     loadProfiles();
     loadNotificationSettings();
     registerNotificationPermission();
@@ -109,6 +112,36 @@ export default function HomeScreen() {
       fetchAllStudentsSummary();
     }
   }, [currentProfileId, selectedDate, profiles]);
+
+  // 🔄 1. 앱 버전 감지 및 자동 캐시 갱신 로직
+  const checkAppVersionAndUpdate = async () => {
+    try {
+      const savedVersion = await AsyncStorage.getItem('app_installed_version');
+      
+      // 앱을 처음 설치했거나, 새 버전으로 업데이트된 경우
+      if (savedVersion !== CURRENT_APP_VERSION) {
+        await AsyncStorage.setItem('app_installed_version', CURRENT_APP_VERSION);
+        
+        // 웹/PWA 환경인 경우 브라우저 캐시를 무효화하고 최신 리소스 로드
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          if (savedVersion !== null) { // 첫 접속이 아니었다면 업데이트 알림 후 새로고침
+            Alert.alert(
+              '🎉 새 버전을 불러옵니다',
+              '최신 기능 및 안정성 업데이트가 적용되었습니다.',
+              [
+                {
+                  text: '확인',
+                  onPress: () => window.location.reload(),
+                },
+              ]
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.error('버전 확인 오류:', e);
+    }
+  };
 
   // === 데이터 로드 및 저장 로직 ===
   const loadProfiles = async () => {
@@ -189,7 +222,6 @@ export default function HomeScreen() {
     setSettingsModalVisible(false);
   };
 
-  // 시간 조정 함수 (+/-)
   const adjustHour = (delta: number) => {
     setSelectedTime((prev) => {
       let newHour = (prev.hour + delta) % 24;
@@ -334,7 +366,6 @@ export default function HomeScreen() {
     setSummaryLoading(false);
   };
 
-  // 날짜 변경 함수
   const changeDate = (days: number) => {
     const current = new Date(selectedDate);
     current.setDate(current.getDate() + days);
@@ -402,9 +433,10 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
-      {/* 헤더 */}
+      {/* 헤더 (버전 표시 추가) */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🥗 급식 알레르기 체커</Text>
+        <Text style={styles.versionText}>v{CURRENT_APP_VERSION}</Text>
       </View>
 
       {/* 1. 프로필 선택 영역 */}
@@ -530,7 +562,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* === 모달 1: 알림 시간 설정 팝업 (개선 버전) === */}
+      {/* 모달 1: 알림 설정 */}
       <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalBackdrop}>
           <View style={styles.settingsModalCard}>
@@ -545,9 +577,7 @@ export default function HomeScreen() {
               <View style={styles.timePickerContainer}>
                 <Text style={styles.timePickerLabel}>알림을 받을 시간 설정</Text>
                 
-                {/* 시/분 조정 컨트롤러 */}
                 <View style={styles.timeControlsRow}>
-                  {/* 시 조정 */}
                   <View style={styles.timeBlock}>
                     <Text style={styles.timeBlockLabel}>시 (Hour)</Text>
                     <View style={styles.counterRow}>
@@ -565,7 +595,6 @@ export default function HomeScreen() {
 
                   <Text style={styles.timeColon}>:</Text>
 
-                  {/* 분 조정 */}
                   <View style={styles.timeBlock}>
                     <Text style={styles.timeBlockLabel}>분 (Minute)</Text>
                     <View style={styles.counterRow}>
@@ -602,7 +631,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      {/* === 모달 2: 학생 프로필 추가 === */}
+      {/* 모달 2: 학생 프로필 추가 */}
       <Modal visible={isModalOpen} animationType="slide" transparent={false}>
         <ScrollView style={styles.modalContainer}>
           <Text style={styles.modalTitle}>학생 / 자녀 프로필 추가</Text>
@@ -671,11 +700,11 @@ export default function HomeScreen() {
   );
 }
 
-// === 스타일 시트 ===
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
-  header: { paddingTop: 50, paddingBottom: 15, backgroundColor: '#ffffff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
+  header: { paddingTop: 50, paddingBottom: 12, backgroundColor: '#ffffff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50' },
+  versionText: { fontSize: 11, color: '#95a5a6', marginTop: 2 },
   card: { backgroundColor: '#ffffff', marginHorizontal: 15, marginTop: 15, padding: 15, borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
@@ -724,7 +753,6 @@ const styles = StyleSheet.create({
   safeSummaryBox: { backgroundColor: '#e8f8f5', padding: 10, borderRadius: 8, alignItems: 'center' },
   safeSummaryText: { color: '#27ae60', fontSize: 13, fontWeight: 'bold' },
 
-  // 알림 설정 모달 스타일
   modalBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
   settingsModalCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15 },
   settingsModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#2c3e50' },
