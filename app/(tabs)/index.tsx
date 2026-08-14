@@ -1,21 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  Platform,
-} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import React, { useEffect, useState } from 'react';
+import { Button, Modal, Switch, Text, TouchableOpacity, View } from 'react-native';
 
-// 알림 수신 설정 (앱 실행 중에도 알림 표시)
+// 알림 동작 기본 설정
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -23,6 +11,88 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
+
+export default function HomeScreen() {
+  const [isModalVisible, setModalVisible] = useState(false);
+  const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
+  const [selectedTime, setSelectedTime] = useState({ hour: 8, minute: 0 }); // 기본 08:00 AM
+
+  // 1. 매일 지정된 시간에 알림 예약 함수
+  const scheduleDailyNotification = async (hour: number, minute: number) => {
+    // 기존에 예약된 알림 취소
+    await Notifications.cancelAllScheduledNotificationsAsync();
+
+    if (!isNotificationEnabled) return;
+
+    // 매일 특정 시간에 울리도록 반복 예약
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "🍱 오늘의 급식 알레르기 리포트",
+        body: "오늘 급식 메뉴에 설정된 알레르기 유발 요소를 확인하세요!",
+      },
+      trigger: {
+        hour,
+        minute,
+        repeats: true,
+      },
+    });
+  };
+
+  // 2. 알림 설정 저장
+  const handleSaveSettings = async () => {
+    await AsyncStorage.setItem('notif_enabled', JSON.stringify(isNotificationEnabled));
+    await AsyncStorage.setItem('notif_time', JSON.stringify(selectedTime));
+    
+    if (isNotificationEnabled) {
+      await scheduleDailyNotification(selectedTime.hour, selectedTime.minute);
+      alert(`${selectedTime.hour}시 ${selectedTime.minute}분에 매일 알림이 설정되었습니다.`);
+    } else {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      alert('알림이 꺼졌습니다.');
+    }
+    setModalVisible(false);
+  };
+
+  return (
+    <View style={{ flex: 1, padding: 20 }}>
+      {/* 상단 알림 설정 버튼 */}
+      <TouchableOpacity onPress={() => setModalVisible(true)} style={{ backgroundColor: '#FFA500', padding: 10, borderRadius: 20 }}>
+        <Text style={{ color: '#fff', fontWeight: 'bold' }}>🔔 알림 설정</Text>
+      </TouchableOpacity>
+
+      {/* 알림 설정 팝업 모달 */}
+      <Modal visible={isModalVisible} animationType="slide" transparent={true}>
+        <View style={{ flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', padding: 20, borderRadius: 15 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15 }}>🔔 급식 알림 설정</Text>
+
+            {/* ON / OFF 스위치 */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 16 }}>알림 받기</Text>
+              <Switch value={isNotificationEnabled} onValueChange={setIsNotificationEnabled} />
+            </View>
+
+            {/* 시간 선택 (간단한 예시) */}
+            {isNotificationEnabled && (
+              <View style={{ marginBottom: 20 }}>
+                <Text style={{ fontSize: 16, marginBottom: 10 }}>알림 시간 지정</Text>
+                {/* 실제 구현 시 @react-native-community/datetimepicker 모듈을 사용하면 시계 형태로 선택 가능합니다. */}
+                <Text style={{ fontSize: 20, color: '#007AFF', textAlign: 'center' }}>
+                  매일 오전 {selectedTime.hour.toString().padStart(2, '0')}:{selectedTime.minute.toString().padStart(2, '0')}
+                </Text>
+              </View>
+            )}
+
+            <Button title="저장하기" onPress={handleSaveSettings} />
+            <View style={{ marginTop: 10 }}>
+              <Button title="닫기" color="#888" onPress={() => setModalVisible(false)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
 
 // 알레르기 번호 매핑 테이블 (나이스 API 기준 1~19번)
 const ALLERGY_MAP: { [key: number]: string } = {
