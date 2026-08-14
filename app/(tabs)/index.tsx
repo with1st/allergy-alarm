@@ -16,10 +16,9 @@ import {
   View,
 } from 'react-native';
 
-// 🚀 앱 버전 정의 (앞으로 코드를 수정하고 배포할 때마다 이 숫자를 '1.0.2', '1.0.3'으로 올려주시면 됩니다!)
-const CURRENT_APP_VERSION = '1.0.1';
+// 🚀 앱 버전 (개선 사항 반영 v1.0.2)
+const CURRENT_APP_VERSION = '1.0.2';
 
-// 푸시 알림 동작 기본 설정
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -28,7 +27,6 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// 오늘 날짜 YYYY-MM-DD 포맷 가져오기
 const getTodayString = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -37,7 +35,6 @@ const getTodayString = () => {
   return `${year}-${month}-${day}`;
 };
 
-// 알레르기 번호 매핑 테이블 (나이스 API 기준 1~19번)
 const ALLERGY_MAP: { [key: number]: string } = {
   1: '난류', 2: '우유', 3: '메밀', 4: '땅콩', 5: '대두',
   6: '밀', 7: '고등어', 8: '게', 9: '새우', 10: '돼지고기',
@@ -71,7 +68,6 @@ interface StudentRiskSummary {
 }
 
 export default function HomeScreen() {
-  // === 기본 앱 상태 관리 ===
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentProfileId, setCurrentProfileId] = useState<string>('');
   
@@ -83,7 +79,6 @@ export default function HomeScreen() {
   const [studentSummaries, setStudentSummaries] = useState<StudentRiskSummary[]>([]);
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
 
-  // === 프로필 추가 모달 및 검색 상태 ===
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [searchSchoolQuery, setSearchSchoolQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -91,12 +86,12 @@ export default function HomeScreen() {
   const [newStudentName, setNewStudentName] = useState<string>('');
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
 
-  // === 🔔 알림 설정 관련 상태 ===
+  // 🔔 알림 및 시간 설정 상태 (문자열 직접 입력 방식)
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
   const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
-  const [selectedTime, setSelectedTime] = useState({ hour: 8, minute: 0 });
+  const [inputHour, setInputHour] = useState<string>('08');
+  const [inputMinute, setInputMinute] = useState<string>('00');
 
-  // 초기 데이터 로드 및 버전 감지
   useEffect(() => {
     checkAppVersionAndUpdate();
     loadProfiles();
@@ -113,28 +108,16 @@ export default function HomeScreen() {
     }
   }, [currentProfileId, selectedDate, profiles]);
 
-  // 🔄 1. 앱 버전 감지 및 자동 캐시 갱신 로직
   const checkAppVersionAndUpdate = async () => {
     try {
       const savedVersion = await AsyncStorage.getItem('app_installed_version');
-      
-      // 앱을 처음 설치했거나, 새 버전으로 업데이트된 경우
       if (savedVersion !== CURRENT_APP_VERSION) {
         await AsyncStorage.setItem('app_installed_version', CURRENT_APP_VERSION);
-        
-        // 웹/PWA 환경인 경우 브라우저 캐시를 무효화하고 최신 리소스 로드
         if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          if (savedVersion !== null) { // 첫 접속이 아니었다면 업데이트 알림 후 새로고침
-            Alert.alert(
-              '🎉 새 버전을 불러옵니다',
-              '최신 기능 및 안정성 업데이트가 적용되었습니다.',
-              [
-                {
-                  text: '확인',
-                  onPress: () => window.location.reload(),
-                },
-              ]
-            );
+          if (savedVersion !== null) {
+            Alert.alert('🎉 새 버전을 불러옵니다', '최신 기능 및 안정성 업데이트가 적용되었습니다.', [
+              { text: '확인', onPress: () => window.location.reload() },
+            ]);
           }
         }
       }
@@ -143,7 +126,6 @@ export default function HomeScreen() {
     }
   };
 
-  // === 데이터 로드 및 저장 로직 ===
   const loadProfiles = async () => {
     try {
       const data = await AsyncStorage.getItem('@profiles');
@@ -168,11 +150,10 @@ export default function HomeScreen() {
     }
   };
 
-  // === 알림 권한 및 스케줄링 ===
   const registerNotificationPermission = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
-      console.log('알림 권한이 거부되었습니다.');
+      console.log('알림 권한 거부됨');
     }
   };
 
@@ -181,7 +162,11 @@ export default function HomeScreen() {
       const enabled = await AsyncStorage.getItem('notif_enabled');
       const time = await AsyncStorage.getItem('notif_time');
       if (enabled !== null) setIsNotificationEnabled(JSON.parse(enabled));
-      if (time !== null) setSelectedTime(JSON.parse(time));
+      if (time !== null) {
+        const parsedTime = JSON.parse(time);
+        setInputHour(String(parsedTime.hour).padStart(2, '0'));
+        setInputMinute(String(parsedTime.minute).padStart(2, '0'));
+      }
     } catch (e) {
       console.error('알림 설정 로드 실패:', e);
     }
@@ -189,13 +174,12 @@ export default function HomeScreen() {
 
   const scheduleDailyNotification = async (hour: number, minute: number) => {
     await Notifications.cancelAllScheduledNotificationsAsync();
-
     if (!isNotificationEnabled) return;
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: "🥗 오늘의 급식 알레르기 리포트",
-        body: "오늘 자녀/학생의 급식 메뉴에 설정된 알레르기 유발 요소를 확인하세요!",
+        title: '🥗 오늘의 급식 알레르기 리포트',
+        body: '오늘 자녀/학생의 급식 메뉴에 설정된 알레르기 유발 요소를 확인하세요!',
         sound: true,
       },
       trigger: {
@@ -206,41 +190,40 @@ export default function HomeScreen() {
     });
   };
 
+  // 💡 알림 설정 저장 (저장 즉시 모달 닫힘 처리)
   const handleSaveSettings = async () => {
+    let hourNum = parseInt(inputHour, 10) || 0;
+    let minNum = parseInt(inputMinute, 10) || 0;
+
+    if (hourNum < 0) hourNum = 0;
+    if (hourNum > 23) hourNum = 23;
+    if (minNum < 0) minNum = 0;
+    if (minNum > 59) minNum = 59;
+
+    const timeObj = { hour: hourNum, minute: minNum };
+
     await AsyncStorage.setItem('notif_enabled', JSON.stringify(isNotificationEnabled));
-    await AsyncStorage.setItem('notif_time', JSON.stringify(selectedTime));
-    
+    await AsyncStorage.setItem('notif_time', JSON.stringify(timeObj));
+
     if (isNotificationEnabled) {
-      await scheduleDailyNotification(selectedTime.hour, selectedTime.minute);
-      const period = selectedTime.hour < 12 ? '오전' : '오후';
-      const displayHour = selectedTime.hour % 12 === 0 ? 12 : selectedTime.hour % 12;
-      Alert.alert('설정 완료', `매일 ${period} ${displayHour}시 ${selectedTime.minute.toString().padStart(2, '0')}분에 알림이 울립니다.`);
+      await scheduleDailyNotification(hourNum, minNum);
+      const period = hourNum < 12 ? '오전' : '오후';
+      const displayHour = hourNum % 12 === 0 ? 12 : hourNum % 12;
+      Alert.alert(
+        '설정 완료',
+        `매일 ${period} ${displayHour}시 ${minNum.toString().padStart(2, '0')}분에 알림이 울립니다.`
+      );
     } else {
       await Notifications.cancelAllScheduledNotificationsAsync();
       Alert.alert('설정 완료', '알림이 꺼졌습니다.');
     }
+
+    // ✨ 저장 완료 후 창 바로 닫기
     setSettingsModalVisible(false);
-  };
-
-  const adjustHour = (delta: number) => {
-    setSelectedTime((prev) => {
-      let newHour = (prev.hour + delta) % 24;
-      if (newHour < 0) newHour += 24;
-      return { ...prev, hour: newHour };
-    });
-  };
-
-  const adjustMinute = (delta: number) => {
-    setSelectedTime((prev) => {
-      let newMin = (prev.minute + delta) % 60;
-      if (newMin < 0) newMin += 60;
-      return { ...prev, minute: newMin };
-    });
   };
 
   const currentProfile = profiles.find((p) => p.id === currentProfileId);
 
-  // === 급식 데이터 조회 로직 ===
   const fetchMealData = async () => {
     if (!currentProfile) return;
     setLoading(true);
@@ -433,7 +416,7 @@ export default function HomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
-      {/* 헤더 (버전 표시 추가) */}
+      {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🥗 급식 알레르기 체커</Text>
         <Text style={styles.versionText}>v{CURRENT_APP_VERSION}</Text>
@@ -464,36 +447,61 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* 2. 날짜 선택 영역 */}
+      {/* 2. 날짜 선택 영역 (웹/모바일 보완) */}
       <View style={styles.card}>
         <View style={styles.dateRow}>
           <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(-1)}>
             <Text style={styles.dateNavBtnText}>◀ 이전일</Text>
           </TouchableOpacity>
+          
           <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
             <Text style={styles.dateText}>📅 {selectedDate}</Text>
             <Text style={styles.dateSubText}>(터치하여 달력 선택)</Text>
           </TouchableOpacity>
+
           <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(1)}>
             <Text style={styles.dateNavBtnText}>다음일 ▶</Text>
           </TouchableOpacity>
         </View>
 
+        {/* ✨ 웹 환경 호환 가능한 달력 선택 처리 */}
         {showDatePicker && (
-          <DateTimePicker
-            value={new Date(selectedDate)}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'calendar' : 'default'}
-            onChange={(event, date) => {
-              setShowDatePicker(false);
-              if (date) {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0');
-                const day = String(date.getDate()).padStart(2, '0');
-                setSelectedDate(`${year}-${month}-${day}`);
-              }
-            }}
-          />
+          Platform.OS === 'web' ? (
+            <View style={{ alignItems: 'center', marginTop: 10 }}>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedDate(e.target.value);
+                  }
+                  setShowDatePicker(false);
+                }}
+                style={{
+                  padding: '8px 12px',
+                  fontSize: '16px',
+                  borderRadius: '8px',
+                  border: '1px solid #bdc3c7',
+                  outline: 'none',
+                }}
+              />
+            </View>
+          ) : (
+            <DateTimePicker
+              value={new Date(selectedDate)}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'calendar' : 'default'}
+              onChange={(event, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  setSelectedDate(`${year}-${month}-${day}`);
+                }
+              }}
+            />
+          )
         )}
       </View>
 
@@ -562,7 +570,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* 모달 1: 알림 설정 */}
+      {/* 모달 1: 알림 설정 (직접 시간/분 입력 및 즉시 닫기) */}
       <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalBackdrop}>
           <View style={styles.settingsModalCard}>
@@ -575,46 +583,40 @@ export default function HomeScreen() {
 
             {isNotificationEnabled && (
               <View style={styles.timePickerContainer}>
-                <Text style={styles.timePickerLabel}>알림을 받을 시간 설정</Text>
+                <Text style={styles.timePickerLabel}>알림을 받을 시간 입력 (24시간 형식 / 1분 단위)</Text>
                 
-                <View style={styles.timeControlsRow}>
-                  <View style={styles.timeBlock}>
-                    <Text style={styles.timeBlockLabel}>시 (Hour)</Text>
-                    <View style={styles.counterRow}>
-                      <TouchableOpacity style={styles.timeBtn} onPress={() => adjustHour(-1)}>
-                        <Text style={styles.timeBtnText}>-</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.timeDisplay}>
-                        {selectedTime.hour.toString().padStart(2, '0')}
-                      </Text>
-                      <TouchableOpacity style={styles.timeBtn} onPress={() => adjustHour(1)}>
-                        <Text style={styles.timeBtnText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+                <View style={styles.timeDirectInputRow}>
+                  <View style={styles.timeInputBlock}>
+                    <Text style={styles.timeInputLabel}>시 (0~23)</Text>
+                    <TextInput
+                      style={styles.timeNumberInput}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      value={inputHour}
+                      onChangeText={(text) => setInputHour(text.replace(/[^0-9]/g, ''))}
+                      placeholder="08"
+                    />
                   </View>
 
-                  <Text style={styles.timeColon}>:</Text>
+                  <Text style={styles.timeColonLarge}>:</Text>
 
-                  <View style={styles.timeBlock}>
-                    <Text style={styles.timeBlockLabel}>분 (Minute)</Text>
-                    <View style={styles.counterRow}>
-                      <TouchableOpacity style={styles.timeBtn} onPress={() => adjustMinute(-5)}>
-                        <Text style={styles.timeBtnText}>-</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.timeDisplay}>
-                        {selectedTime.minute.toString().padStart(2, '0')}
-                      </Text>
-                      <TouchableOpacity style={styles.timeBtn} onPress={() => adjustMinute(5)}>
-                        <Text style={styles.timeBtnText}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+                  <View style={styles.timeInputBlock}>
+                    <Text style={styles.timeInputLabel}>분 (0~59)</Text>
+                    <TextInput
+                      style={styles.timeNumberInput}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      value={inputMinute}
+                      onChangeText={(text) => setInputMinute(text.replace(/[^0-9]/g, ''))}
+                      placeholder="00"
+                    />
                   </View>
                 </View>
 
                 <Text style={styles.selectedTimePreview}>
-                  현재 설정: 매일 {selectedTime.hour < 12 ? '오전' : '오후'}{' '}
-                  {selectedTime.hour % 12 === 0 ? 12 : selectedTime.hour % 12}시{' '}
-                  {selectedTime.minute.toString().padStart(2, '0')}분
+                  설정 예정: {parseInt(inputHour || '0', 10) < 12 ? '오전' : '오후'}{' '}
+                  {parseInt(inputHour || '0', 10) % 12 === 0 ? 12 : parseInt(inputHour || '0', 10) % 12}시{' '}
+                  {String(parseInt(inputMinute || '0', 10)).padStart(2, '0')}분
                 </Text>
               </View>
             )}
@@ -624,7 +626,7 @@ export default function HomeScreen() {
                 <Text style={styles.saveSettingsBtnText}>저장하기</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.closeSettingsBtn} onPress={() => setSettingsModalVisible(false)}>
-                <Text style={styles.closeSettingsBtnText}>닫기</Text>
+                <Text style={styles.closeSettingsBtnText}>취소</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -721,7 +723,7 @@ const styles = StyleSheet.create({
   dateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateNavBtn: { backgroundColor: '#e0e0e0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   dateNavBtnText: { fontSize: 13, fontWeight: 'bold', color: '#333' },
-  datePickerBtn: { alignItems: 'center' },
+  datePickerBtn: { alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4 },
   dateText: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50' },
   dateSubText: { fontSize: 11, color: '#7f8c8d' },
 
@@ -759,15 +761,23 @@ const styles = StyleSheet.create({
   settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   
   timePickerContainer: { marginBottom: 20, alignItems: 'center' },
-  timePickerLabel: { fontSize: 14, fontWeight: 'bold', color: '#555', marginBottom: 15 },
-  timeControlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 15 },
-  timeBlock: { alignItems: 'center' },
-  timeBlockLabel: { fontSize: 12, color: '#888', marginBottom: 6 },
-  counterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  timeBtn: { backgroundColor: '#007AFF', width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  timeBtnText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
-  timeDisplay: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', minWidth: 32, textAlign: 'center' },
-  timeColon: { fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 15 },
+  timePickerLabel: { fontSize: 13, fontWeight: 'bold', color: '#555', marginBottom: 15, textAlign: 'center' },
+  timeDirectInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  timeInputBlock: { alignItems: 'center' },
+  timeInputLabel: { fontSize: 11, color: '#888', marginBottom: 4 },
+  timeNumberInput: {
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 8,
+    width: 65,
+    height: 48,
+    textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2c3e50',
+    backgroundColor: '#f8fafc',
+  },
+  timeColonLarge: { fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 15 },
   selectedTimePreview: { marginTop: 15, fontSize: 14, color: '#007AFF', fontWeight: '600' },
 
   saveSettingsBtn: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
