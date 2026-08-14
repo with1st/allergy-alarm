@@ -16,14 +16,14 @@ import {
   View,
 } from 'react-native';
 
-// 🚀 앱 버전 (개선 사항 반영 v1.0.2)
-const CURRENT_APP_VERSION = '1.0.2';
+// 🚀 앱 버전 v1.0.3 (UI & 알림/달력 모달 버그 수정)
+const CURRENT_APP_VERSION = '1.0.3';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
   }),
 });
 
@@ -73,6 +73,8 @@ export default function HomeScreen() {
   
   const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+  const [tempDate, setTempDate] = useState<Date>(new Date());
+
   const [meals, setMeals] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
@@ -86,7 +88,7 @@ export default function HomeScreen() {
   const [newStudentName, setNewStudentName] = useState<string>('');
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
 
-  // 🔔 알림 및 시간 설정 상태 (문자열 직접 입력 방식)
+  // 🔔 알림 상태
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
   const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
   const [inputHour, setInputHour] = useState<string>('08');
@@ -113,13 +115,6 @@ export default function HomeScreen() {
       const savedVersion = await AsyncStorage.getItem('app_installed_version');
       if (savedVersion !== CURRENT_APP_VERSION) {
         await AsyncStorage.setItem('app_installed_version', CURRENT_APP_VERSION);
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          if (savedVersion !== null) {
-            Alert.alert('🎉 새 버전을 불러옵니다', '최신 기능 및 안정성 업데이트가 적용되었습니다.', [
-              { text: '확인', onPress: () => window.location.reload() },
-            ]);
-          }
-        }
       }
     } catch (e) {
       console.error('버전 확인 오류:', e);
@@ -151,9 +146,18 @@ export default function HomeScreen() {
   };
 
   const registerNotificationPermission = async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') {
-      console.log('알림 권한 거부됨');
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.log('알림 권한이 거부되었습니다.');
+      }
+    } catch (e) {
+      console.error('알림 권한 요청 오류', e);
     }
   };
 
@@ -173,24 +177,45 @@ export default function HomeScreen() {
   };
 
   const scheduleDailyNotification = async (hour: number, minute: number) => {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    if (!isNotificationEnabled) return;
+    try {
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      if (!isNotificationEnabled) return;
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '🥗 오늘의 급식 알레르기 리포트',
-        body: '오늘 자녀/학생의 급식 메뉴에 설정된 알레르기 유발 요소를 확인하세요!',
-        sound: true,
-      },
-      trigger: {
-        hour,
-        minute,
-        repeats: true,
-      },
-    });
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🥗 오늘의 급식 알레르기 리포트',
+          body: '오늘 자녀/학생의 급식 메뉴에 설정된 알레르기 유발 요소를 확인해보세요!',
+          sound: true,
+        },
+        trigger: {
+          hour,
+          minute,
+          repeats: true,
+        },
+      });
+    } catch (e) {
+      console.error('알림 스케줄링 실패:', e);
+    }
   };
 
-  // 💡 알림 설정 저장 (저장 즉시 모달 닫힘 처리)
+  // 🧪 테스트용: 10초 후 알림 발송
+  const triggerTestNotification = async () => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🔔 [테스트] 급식 알레르기 알림',
+          body: '알림이 정상적으로 수신됩니다!',
+          sound: true,
+        },
+        trigger: { seconds: 5 },
+      });
+      Alert.alert('테스트 알림 발송', '5초 뒤 테스트 알림이 도착합니다.');
+    } catch (e) {
+      Alert.alert('알림 오류', '기기에서 알림 권한이 허용되어 있는지 확인해 주세요.');
+    }
+  };
+
+  // 💡 알림 저장 및 창 즉시 닫기
   const handleSaveSettings = async () => {
     let hourNum = parseInt(inputHour, 10) || 0;
     let minNum = parseInt(inputMinute, 10) || 0;
@@ -207,19 +232,22 @@ export default function HomeScreen() {
 
     if (isNotificationEnabled) {
       await scheduleDailyNotification(hourNum, minNum);
-      const period = hourNum < 12 ? '오전' : '오후';
-      const displayHour = hourNum % 12 === 0 ? 12 : hourNum % 12;
-      Alert.alert(
-        '설정 완료',
-        `매일 ${period} ${displayHour}시 ${minNum.toString().padStart(2, '0')}분에 알림이 울립니다.`
-      );
     } else {
       await Notifications.cancelAllScheduledNotificationsAsync();
-      Alert.alert('설정 완료', '알림이 꺼졌습니다.');
     }
 
-    // ✨ 저장 완료 후 창 바로 닫기
+    // ✨ 창부터 즉시 닫고 알림 메시지 띄우기
     setSettingsModalVisible(false);
+
+    const period = hourNum < 12 ? '오전' : '오후';
+    const displayHour = hourNum % 12 === 0 ? 12 : hourNum % 12;
+    const timeText = isNotificationEnabled
+      ? `매일 ${period} ${displayHour}시 ${minNum.toString().padStart(2, '0')}분에 알림이 설정되었습니다.`
+      : '알림이 꺼졌습니다.';
+
+    setTimeout(() => {
+      Alert.alert('설정 완료', timeText);
+    }, 100);
   };
 
   const currentProfile = profiles.find((p) => p.id === currentProfileId);
@@ -358,6 +386,19 @@ export default function HomeScreen() {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
+  const openCalendarModal = () => {
+    setTempDate(new Date(selectedDate));
+    setShowDatePicker(true);
+  };
+
+  const confirmDateChange = () => {
+    const year = tempDate.getFullYear();
+    const month = String(tempDate.getMonth() + 1).padStart(2, '0');
+    const day = String(tempDate.getDate()).padStart(2, '0');
+    setSelectedDate(`${year}-${month}-${day}`);
+    setShowDatePicker(false);
+  };
+
   const searchSchool = async () => {
     const query = searchSchoolQuery.trim();
     if (!query) {
@@ -447,14 +488,14 @@ export default function HomeScreen() {
         </ScrollView>
       </View>
 
-      {/* 2. 날짜 선택 영역 (웹/모바일 보완) */}
+      {/* 2. 날짜 선택 영역 */}
       <View style={styles.card}>
         <View style={styles.dateRow}>
           <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(-1)}>
             <Text style={styles.dateNavBtnText}>◀ 이전일</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.datePickerBtn} onPress={() => setShowDatePicker(true)}>
+          <TouchableOpacity style={styles.datePickerBtn} onPress={openCalendarModal}>
             <Text style={styles.dateText}>📅 {selectedDate}</Text>
             <Text style={styles.dateSubText}>(터치하여 달력 선택)</Text>
           </TouchableOpacity>
@@ -463,47 +504,63 @@ export default function HomeScreen() {
             <Text style={styles.dateNavBtnText}>다음일 ▶</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* ✨ 웹 환경 호환 가능한 달력 선택 처리 */}
-        {showDatePicker && (
-          Platform.OS === 'web' ? (
-            <View style={{ alignItems: 'center', marginTop: 10 }}>
+      {/* ✨ 팝업 모달 형태의 달력 (원터치 표시) */}
+      <Modal visible={showDatePicker} transparent={true} animationType="fade">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.calendarModalCard}>
+            <Text style={styles.calendarTitle}>📅 날짜 선택</Text>
+
+            {Platform.OS === 'web' ? (
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => {
                   if (e.target.value) {
                     setSelectedDate(e.target.value);
+                    setShowDatePicker(false);
                   }
-                  setShowDatePicker(false);
                 }}
                 style={{
-                  padding: '8px 12px',
-                  fontSize: '16px',
+                  padding: '12px',
+                  fontSize: '18px',
                   borderRadius: '8px',
-                  border: '1px solid #bdc3c7',
-                  outline: 'none',
+                  border: '1px solid #007AFF',
+                  marginVertical: '20px',
                 }}
               />
-            </View>
-          ) : (
-            <DateTimePicker
-              value={new Date(selectedDate)}
-              mode="date"
-              display={Platform.OS === 'ios' ? 'calendar' : 'default'}
-              onChange={(event, date) => {
-                setShowDatePicker(false);
-                if (date) {
-                  const year = date.getFullYear();
-                  const month = String(date.getMonth() + 1).padStart(2, '0');
-                  const day = String(date.getDate()).padStart(2, '0');
-                  setSelectedDate(`${year}-${month}-${day}`);
-                }
-              }}
-            />
-          )
-        )}
-      </View>
+            ) : (
+              <View style={{ alignItems: 'center', marginVertical: 10 }}>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="inline"
+                  onChange={(event, date) => {
+                    if (date) setTempDate(date);
+                  }}
+                  style={{ width: 300, height: 320 }}
+                />
+              </View>
+            )}
+
+            {Platform.OS !== 'web' && (
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: '#e0e0e0', flex: 1 }]}
+                  onPress={() => setShowDatePicker(false)}>
+                  <Text style={{ color: '#333', fontWeight: 'bold' }}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: '#007AFF', flex: 1 }]}
+                  onPress={confirmDateChange}>
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>선택 완료</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* 3. 선택 학생의 급식 점검 리포트 */}
       <View style={styles.card}>
@@ -570,7 +627,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* 모달 1: 알림 설정 (직접 시간/분 입력 및 즉시 닫기) */}
+      {/* 모달 1: 알림 설정 */}
       <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalBackdrop}>
           <View style={styles.settingsModalCard}>
@@ -618,6 +675,10 @@ export default function HomeScreen() {
                   {parseInt(inputHour || '0', 10) % 12 === 0 ? 12 : parseInt(inputHour || '0', 10) % 12}시{' '}
                   {String(parseInt(inputMinute || '0', 10)).padStart(2, '0')}분
                 </Text>
+
+                <TouchableOpacity style={styles.testNotifBtn} onPress={triggerTestNotification}>
+                  <Text style={styles.testNotifBtnText}>🧪 5초 후 테스트 알림 울리기</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -755,11 +816,14 @@ const styles = StyleSheet.create({
   safeSummaryBox: { backgroundColor: '#e8f8f5', padding: 10, borderRadius: 8, alignItems: 'center' },
   safeSummaryText: { color: '#27ae60', fontSize: 13, fontWeight: 'bold' },
 
-  modalBackdrop: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
-  settingsModalCard: { backgroundColor: '#fff', padding: 20, borderRadius: 15 },
+  modalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
+  settingsModalCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15 },
   settingsModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#2c3e50' },
   settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   
+  calendarModalCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15, alignItems: 'center' },
+  calendarTitle: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 10 },
+
   timePickerContainer: { marginBottom: 20, alignItems: 'center' },
   timePickerLabel: { fontSize: 13, fontWeight: 'bold', color: '#555', marginBottom: 15, textAlign: 'center' },
   timeDirectInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
@@ -778,7 +842,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   timeColonLarge: { fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 15 },
-  selectedTimePreview: { marginTop: 15, fontSize: 14, color: '#007AFF', fontWeight: '600' },
+  selectedTimePreview: { marginTop: 12, fontSize: 13, color: '#007AFF', fontWeight: '600' },
+  
+  testNotifBtn: { marginTop: 15, backgroundColor: '#eef2f5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  testNotifBtnText: { fontSize: 12, color: '#555', fontWeight: '600' },
 
   saveSettingsBtn: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   saveSettingsBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
@@ -804,7 +871,7 @@ const styles = StyleSheet.create({
   allergyChipText: { fontSize: 12, color: '#7f8c8d' },
   allergyChipTextSelected: { color: '#ffffff', fontWeight: 'bold' },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 30, marginBottom: 50 },
-  modalBtn: { flex: 0.48, paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
+  modalBtn: { paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   cancelBtn: { backgroundColor: '#95a5a6' },
   saveBtn: { backgroundColor: '#27ae60' },
   modalBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
