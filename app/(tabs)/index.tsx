@@ -738,7 +738,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* 모달 1: 알림 설정 */}
+     {/* 모달 1: 알림 설정 */}
       <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalBackdrop}>
           <View style={styles.settingsModalCard}>
@@ -793,18 +793,13 @@ export default function HomeScreen() {
               </View>
             )}
 
-            <View style={{ gap: 8, marginTop: 10 }}>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
               <TouchableOpacity style={styles.saveSettingsBtn} onPress={handleSaveSettings}>
                 <Text style={styles.saveSettingsBtnText}>저장하기</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.closeSettingsBtn} onPress={() => setSettingsModalVisible(false)}>
                 <Text style={styles.closeSettingsBtnText}>취소</Text>
               </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-      </TouchableOpacity>
             </View>
           </View>
         </View>
