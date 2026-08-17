@@ -128,7 +128,7 @@ export default function HomeScreen() {
         }
 
         // 💡 발급받으신 실제 VAPID PUBLIC KEY로 변경해주세요!
-        const PUBLIC_VAPID_KEY = '여기에_실제_PUBLIC_VAPID_KEY를_넣으세요';
+        const PUBLIC_VAPID_KEY = 'BLkV4_9CRvZa0dz5y3ZDrvaTUG7kIr4qEoVFgrmDqUQ1HbQFzvPqla3eG-MXoEaUrX6epsK4jGWi2VG3tSubnxA';
         const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
 
         const subscription = await registration.pushManager.subscribe({
