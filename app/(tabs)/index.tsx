@@ -36,7 +36,7 @@ const getTodayString = () => {
 
 const ALLERGY_MAP: { [key: number]: string } = {
   1: '난류', 2: '우유', 3: '메밀', 4: '땅콩', 5: '대두',
-  6: '밀', 7: '고등어', 8: '게', 9: '새우', 10: '돼지도기',
+  6: '밀', 7: '고등어', 8: '게', 9: '새우', 10: '돼지고기',
   11: '복숭아', 12: '토마토', 13: '아황산류', 14: '호두', 15: '닭고기',
   16: '쇠고기', 17: '오징어', 18: '조개류(굴,전복,홍합 포함)', 19: '잣',
 };
@@ -94,6 +94,68 @@ export default function HomeScreen() {
   const [inputMinute, setInputMinute] = useState<string>('00');
 
   const webDateInputRef = useRef<any>(null);
+
+  // ----------------------------------------------------
+  // VAPID 공개키 변환 함수 (웹 푸시용)
+  // ----------------------------------------------------
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  }
+
+  // ----------------------------------------------------
+  // 웹 푸시 서버 구독 처리 함수
+  // ----------------------------------------------------
+  const subscribeToPush = async (selectedHour: string, selectedMinute: string) => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+          alert('알림 권한을 허용해야 푸시를 받을 수 있습니다.');
+          return;
+        }
+
+        // 💡 발급받으신 실제 VAPID PUBLIC KEY로 변경해주세요!
+        const PUBLIC_VAPID_KEY = '여기에_실제_PUBLIC_VAPID_KEY를_넣으세요';
+        const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
+
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey
+        });
+
+        const response = await fetch('http://localhost:5000/subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            subscription,
+            targetHour: selectedHour,
+            targetMinute: selectedMinute,
+          }),
+        });
+
+        if (response.ok) {
+          console.log('백엔드 서버 푸시 구독 성공');
+        }
+      } catch (error) {
+        console.error('푸시 구독 중 오류 발생:', error);
+      }
+    }
+  };
 
   useEffect(() => {
     loadProfiles();
@@ -171,7 +233,6 @@ export default function HomeScreen() {
   const scheduleDailyNotification = async (hour: number, minute: number) => {
     try {
       if (Platform.OS === 'web') {
-        // 웹 브라우저 알림 처리
         if ('Notification' in window && Notification.permission === 'granted') {
           const now = new Date();
           const target = new Date();
@@ -187,7 +248,6 @@ export default function HomeScreen() {
           }, diffMs);
         }
       } else {
-        // 모바일 앱 알림 처리
         await Notifications.cancelAllScheduledNotificationsAsync();
         if (!isNotificationEnabled) return;
 
@@ -259,6 +319,11 @@ export default function HomeScreen() {
 
     if (isNotificationEnabled) {
       await scheduleDailyNotification(hourNum, minNum);
+      
+      // 🔔 웹 환경일 경우 백엔드 푸시 서버 구독 연동
+      if (Platform.OS === 'web') {
+        await subscribeToPush(inputHour, inputMinute);
+      }
     } else {
       if (Platform.OS !== 'web') {
         await Notifications.cancelAllScheduledNotificationsAsync();
@@ -739,13 +804,24 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+      </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* 모달 2: 프로필 추가 */}
       <Modal visible={isModalOpen} animationType="slide" transparent={false}>
         <ScrollView style={styles.modalContainer}>
           <Text style={styles.modalTitle}>학생 / 자녀 프로필 추가</Text>
+
           <Text style={styles.label}>1. 학생/자녀 이름</Text>
-          <TextInput style={styles.input} placeholder="예: 김이봄" value={newStudentName} onChangeText={setNewStudentName} />
+          <TextInput
+            style={styles.input}
+            placeholder="예: 김이봄"
+            value={newStudentName}
+            onChangeText={setNewStudentName}
+          />
 
           <Text style={styles.label}>2. 학교 검색</Text>
           <View style={styles.searchRow}>
@@ -765,7 +841,10 @@ export default function HomeScreen() {
               {searchResults.map((item) => (
                 <TouchableOpacity
                   key={item.SD_SCHUL_CODE}
-                  style={[styles.searchItem, selectedSchool?.SD_SCHUL_CODE === item.SD_SCHUL_CODE && styles.searchItemSelected]}
+                  style={[
+                    styles.searchItem,
+                    selectedSchool?.SD_SCHUL_CODE === item.SD_SCHUL_CODE && styles.searchItemSelected,
+                  ]}
                   onPress={() => setSelectedSchool(item)}>
                   <Text style={styles.schoolNameText}>{item.SCHUL_NM}</Text>
                   <Text style={styles.schoolAddrText}>{item.ORG_RDNMA || item.LCTN_SC_NM}</Text>
@@ -796,7 +875,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.modalBtnRow}>
-            <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn]} onPress={() => setIsModalOpen(false)}>
+            <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn, { marginRight: 10 }]} onPress={() => setIsModalOpen(false)}>
               <Text style={styles.modalBtnText}>취소</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleSaveProfile}>
@@ -893,9 +972,9 @@ const styles = StyleSheet.create({
   testNotifBtn: { marginTop: 15, backgroundColor: '#eef2f5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   testNotifBtnText: { fontSize: 12, color: '#555', fontWeight: '600' },
 
-  saveSettingsBtn: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  saveSettingsBtn: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
   saveSettingsBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  closeSettingsBtn: { backgroundColor: '#e0e0e0', paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  closeSettingsBtn: { backgroundColor: '#e0e0e0', paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
   closeSettingsBtnText: { color: '#444', fontWeight: 'bold', fontSize: 15 },
 
   modalContainer: { flex: 1, padding: 20, paddingTop: 50, backgroundColor: '#fff' },
@@ -917,7 +996,7 @@ const styles = StyleSheet.create({
   allergyChipText: { fontSize: 12, color: '#7f8c8d' },
   allergyChipTextSelected: { color: '#ffffff', fontWeight: 'bold' },
   modalBtnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 30, marginBottom: 50 },
-  modalBtn: { paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
+  modalBtn: { paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
   cancelBtn: { backgroundColor: '#95a5a6' },
   saveBtn: { backgroundColor: '#27ae60' },
   modalBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
