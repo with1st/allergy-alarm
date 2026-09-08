@@ -1,18 +1,33 @@
+// public/sw.js
 self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
-  const title = data.title || '🥗 급식 알레르기 알림';
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { title: '급식 알림', body: event.data.text() };
+    }
+  }
+
+  const title = data.title || '🧪 테스트 푸시 알림';
   const options = {
-    body: data.body || '오늘의 급식 정보를 확인해 주세요.',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    vibrate: [100, 50, 100],
+    body: data.body || '급식 알레르기 안내 메시지입니다.',
+    icon: '/icon.png',
+    badge: '/icon.png',
+    requireInteraction: true, // 사용자가 닫기 전까지 팝업을 계속 유지
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// 알림 클릭 시 앱으로 이동
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  event.waitUntil(clients.openWindow('/'));
+  event.waitUntil(
+    clients.matchAll({ type: 'window' }).then((clientList) => {
+      if (clientList.length > 0) {
+        return clientList[0].focus();
+      }
+      return clients.openWindow('/');
+    })
+  );
 });

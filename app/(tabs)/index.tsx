@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as Notifications from 'expo-notifications';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,34 +16,46 @@ import {
 } from 'react-native';
 
 const CURRENT_APP_VERSION = '1.0.4';
+const VAPID_PUBLIC_KEY = 'BIMm5K3reoqNavT0h6W4vRHNWIUs0Dl9r6gPKxeD15gVwm58TIt2v_U4CH1Q0E_4h1QZGbfkhEX9eDJafd1_ivY';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// base64 문자열을 Uint8Array로 변환하는 헬퍼 함수
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
-const getTodayString = () => {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+interface AllergyItem {
+  id: number;
+  name: string;
+}
 
-const ALLERGY_MAP: { [key: number]: string } = {
-  1: '난류', 2: '우유', 3: '메밀', 4: '땅콩', 5: '대두',
-  6: '밀', 7: '고등어', 8: '게', 9: '새우', 10: '돼지고기',
-  11: '복숭아', 12: '토마토', 13: '아황산류', 14: '호두', 15: '닭고기',
-  16: '쇠고기', 17: '오징어', 18: '조개류(굴,전복,홍합 포함)', 19: '잣',
-};
-
-const ALLERGY_LIST = Object.entries(ALLERGY_MAP).map(([id, name]) => ({
-  id: Number(id),
-  name,
-}));
+const ALLERGY_LIST: AllergyItem[] = [
+  { id: 1, name: '난류(계란)' },
+  { id: 2, name: '우유' },
+  { id: 3, name: '메밀' },
+  { id: 4, name: '땅콩' },
+  { id: 5, name: '대두(콩)' },
+  { id: 6, name: '밀' },
+  { id: 7, name: '고등어' },
+  { id: 8, name: '게' },
+  { id: 9, name: '새우' },
+  { id: 10, name: '돼지고기' },
+  { id: 11, name: '복숭아' },
+  { id: 12, name: '토마토' },
+  { id: 13, name: '아황산류' },
+  { id: 14, name: '호두' },
+  { id: 15, name: '닭고기' },
+  { id: 16, name: '쇠고기' },
+  { id: 17, name: '오징어' },
+  { id: 18, name: '조개류' },
+  { id: 19, name: '잣' },
+];
 
 interface Profile {
   id: string;
@@ -61,106 +72,56 @@ interface MealItem {
   isDanger: boolean;
 }
 
-interface StudentRiskSummary {
+interface StudentSummary {
   studentName: string;
-  dangerItems: { dishName: string; allergies: string[] }[];
+  dangerItems: MealItem[];
 }
 
-export default function HomeScreen() {
+export default function Index() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentProfileId, setCurrentProfileId] = useState<string>('');
-  
-  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
-  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+  const [selectedDate, setSelectedDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(new Date());
+  const webDateInputRef = useRef<HTMLInputElement>(null);
 
   const [meals, setMeals] = useState<MealItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
-  const [studentSummaries, setStudentSummaries] = useState<StudentRiskSummary[]>([]);
+  const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([]);
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
 
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [searchSchoolQuery, setSearchSchoolQuery] = useState<string>('');
+  // 프로필 생성 모달 관련
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
+  const [searchSchoolQuery, setSearchSchoolQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
-  const [newStudentName, setNewStudentName] = useState<string>('');
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
 
-  // 🔔 알림 설정
+  // 알림 설정 모달 관련
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
-  const [isNotificationEnabled, setIsNotificationEnabled] = useState(true);
-  const [inputHour, setInputHour] = useState<string>('08');
-  const [inputMinute, setInputMinute] = useState<string>('00');
-
-  const webDateInputRef = useRef<any>(null);
-
-  // ----------------------------------------------------
-  // VAPID 공개키 변환 함수 (웹 푸시용)
-  // ----------------------------------------------------
-  function urlBase64ToUint8Array(base64String: string) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64 = (base64String + padding)
-      .replace(/\-/g, '+')
-      .replace(/_/g, '/');
-
-    const rawData = window.atob(base64);
-    const outputArray = new Uint8Array(rawData.length);
-
-    for (let i = 0; i < rawData.length; ++i) {
-      outputArray[i] = rawData.charCodeAt(i);
-    }
-    return outputArray;
-  }
-
-  // ----------------------------------------------------
-  // 웹 푸시 서버 구독 처리 함수
-  // ----------------------------------------------------
-  const subscribeToPush = async (selectedHour: string, selectedMinute: string) => {
-    if ('serviceWorker' in navigator && 'PushManager' in window) {
-      try {
-        const registration = await navigator.serviceWorker.register('/sw.js');
-        
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          alert('알림 권한을 허용해야 푸시를 받을 수 있습니다.');
-          return;
-        }
-
-        // 💡 발급받으신 실제 VAPID PUBLIC KEY로 변경해주세요!
-        const PUBLIC_VAPID_KEY = 'BLkV4_9CRvZa0dz5y3ZDrvaTUG7kIr4qEoVFgrmDqUQ1HbQFzvPqla3eG-MXoEaUrX6epsK4jGWi2VG3tSubnxA';
-        const convertedVapidKey = urlBase64ToUint8Array(PUBLIC_VAPID_KEY);
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: convertedVapidKey
-        });
-
-        const response = await fetch('http://localhost:5000/subscribe', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            subscription,
-            targetHour: selectedHour,
-            targetMinute: selectedMinute,
-          }),
-        });
-
-        if (response.ok) {
-          console.log('백엔드 서버 푸시 구독 성공');
-        }
-      } catch (error) {
-        console.error('푸시 구독 중 오류 발생:', error);
-      }
-    }
-  };
+  const [isNotificationEnabled, setIsNotificationEnabled] = useState(false);
+  const [inputHour, setInputHour] = useState('07');
+  const [inputMinute, setInputMinute] = useState('40');
 
   useEffect(() => {
+    // 웹 실행 시 브라우저 로드 완료 후 serviceWorker 안전 등록
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(
+        (registration) => {
+          console.log('ServiceWorker registration successful: ', registration.scope);
+        },
+        (err) => {
+          console.log('ServiceWorker registration failed: ', err);
+        }
+      );
+    }
+
     loadProfiles();
     loadNotificationSettings();
-    registerNotificationPermission();
   }, []);
 
   useEffect(() => {
@@ -174,16 +135,16 @@ export default function HomeScreen() {
 
   const loadProfiles = async () => {
     try {
-      const data = await AsyncStorage.getItem('@profiles');
-      if (data) {
-        const parsedProfiles: Profile[] = JSON.parse(data);
-        setProfiles(parsedProfiles);
-        if (parsedProfiles.length > 0) {
-          setCurrentProfileId(parsedProfiles[0].id);
+      const saved = await AsyncStorage.getItem('@profiles');
+      if (saved) {
+        const parsed: Profile[] = JSON.parse(saved);
+        setProfiles(parsed);
+        if (parsed.length > 0) {
+          setCurrentProfileId(parsed[0].id);
         }
       }
     } catch (e) {
-      console.error('프로필 로드 실패', e);
+      console.error(e);
     }
   };
 
@@ -192,216 +153,175 @@ export default function HomeScreen() {
       await AsyncStorage.setItem('@profiles', JSON.stringify(newProfiles));
       setProfiles(newProfiles);
     } catch (e) {
-      console.error('프로필 저장 실패', e);
-    }
-  };
-
-  const registerNotificationPermission = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        if ('Notification' in window && Notification.permission !== 'granted') {
-          await Notification.requestPermission();
-        }
-      } else {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-      }
-    } catch (e) {
-      console.error('알림 권한 요청 오류', e);
+      console.error(e);
     }
   };
 
   const loadNotificationSettings = async () => {
     try {
-      const enabled = await AsyncStorage.getItem('notif_enabled');
-      const time = await AsyncStorage.getItem('notif_time');
+      const enabled = await AsyncStorage.getItem('@notif_enabled');
+      const time = await AsyncStorage.getItem('@notif_time');
       if (enabled !== null) setIsNotificationEnabled(JSON.parse(enabled));
-      if (time !== null) {
-        const parsedTime = JSON.parse(time);
-        setInputHour(String(parsedTime.hour).padStart(2, '0'));
-        setInputMinute(String(parsedTime.minute).padStart(2, '0'));
+      if (time) {
+        const [h, m] = time.split(':');
+        setInputHour(h);
+        setInputMinute(m);
       }
     } catch (e) {
-      console.error('알림 설정 로드 실패:', e);
-    }
-  };
-
-  const scheduleDailyNotification = async (hour: number, minute: number) => {
-    try {
-      if (Platform.OS === 'web') {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          const now = new Date();
-          const target = new Date();
-          target.setHours(hour, minute, 0, 0);
-          if (target <= now) {
-            target.setDate(target.getDate() + 1);
-          }
-          const diffMs = target.getTime() - now.getTime();
-          setTimeout(() => {
-            new Notification('🥗 오늘의 급식 알레르기 리포트', {
-              body: '오늘 자녀/학생의 급식 알레르기 유발 정보를 확인하세요!',
-            });
-          }, diffMs);
-        }
-      } else {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-        if (!isNotificationEnabled) return;
-
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '🥗 오늘의 급식 알레르기 리포트',
-            body: '오늘 자녀/학생의 급식 메뉴에 설정된 알레르기 유발 요소를 확인해보세요!',
-            sound: true,
-          },
-          trigger: {
-            hour,
-            minute,
-            repeats: true,
-          },
-        });
-      }
-    } catch (e) {
-      console.error('알림 스케줄링 실패:', e);
-    }
-  };
-
-  const triggerTestNotification = async () => {
-    if (Platform.OS === 'web') {
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          setTimeout(() => {
-            new Notification('🔔 [테스트] 급식 알레르기 알림', {
-              body: '브라우저 웹 알림이 정상 작동합니다!',
-            });
-          }, 3000);
-          alert('3초 후 브라우저 알림이 도착합니다.');
-        } else {
-          const perm = await Notification.requestPermission();
-          if (perm !== 'granted') {
-            alert('브라우저 알림 권한을 허용해 주세요.');
-          }
-        }
-      }
-    } else {
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '🔔 [테스트] 급식 알레르기 알림',
-            body: '알림이 정상적으로 수신됩니다!',
-            sound: true,
-          },
-          trigger: { seconds: 5 },
-        });
-        Alert.alert('테스트 알림 발송', '5초 뒤 테스트 알림이 도착합니다.');
-      } catch (e) {
-        Alert.alert('알림 오류', '앱 설정에서 알림 권한이 허용되어 있는지 확인해 주세요.');
-      }
+      console.error(e);
     }
   };
 
   const handleSaveSettings = async () => {
-    let hourNum = parseInt(inputHour, 10) || 0;
-    let minNum = parseInt(inputMinute, 10) || 0;
+    try {
+      const h = String(parseInt(inputHour || '0', 10)).padStart(2, '0');
+      const m = String(parseInt(inputMinute || '0', 10)).padStart(2, '0');
+      const timeStr = `${h}:${m}`;
 
-    if (hourNum < 0) hourNum = 0;
-    if (hourNum > 23) hourNum = 23;
-    if (minNum < 0) minNum = 0;
-    if (minNum > 59) minNum = 59;
+      await AsyncStorage.setItem('@notif_enabled', JSON.stringify(isNotificationEnabled));
+      await AsyncStorage.setItem('@notif_time', timeStr);
 
-    const timeObj = { hour: hourNum, minute: minNum };
-
-    await AsyncStorage.setItem('notif_enabled', JSON.stringify(isNotificationEnabled));
-    await AsyncStorage.setItem('notif_time', JSON.stringify(timeObj));
-
-    if (isNotificationEnabled) {
-      await scheduleDailyNotification(hourNum, minNum);
-      
-      // 🔔 웹 환경일 경우 백엔드 푸시 서버 구독 연동
       if (Platform.OS === 'web') {
-        await subscribeToPush(inputHour, inputMinute);
+        await subscribeToPush();
+
+        // 백엔드 서버로 설정된 알림 시간 전송
+        await fetch('http://localhost:5000/set-time', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: isNotificationEnabled,
+            time: timeStr,
+          }),
+        });
       }
-    } else {
-      if (Platform.OS !== 'web') {
-        await Notifications.cancelAllScheduledNotificationsAsync();
+
+      Alert.alert('알림 설정', `매일 ${timeStr}에 급식 알림이 설정되었습니다.`);
+      setSettingsModalVisible(false);
+    } catch (e) {
+      Alert.alert('오류', '알림 설정을 저장하는데 실패했습니다.');
+    }
+  };
+
+  const subscribeToPush = async () => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          });
+        }
+        await fetch('http://localhost:5000/subscribe', {
+          method: 'POST',
+          body: JSON.stringify(subscription),
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } catch (e) {
+        console.error('Push 구독 실패:', e);
       }
     }
+  };
 
-    setSettingsModalVisible(false);
+  const triggerTestNotification = async () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          // 서버 발송 전 구독 정보 최신화
+          await subscribeToPush();
+          try {
+            const res = await fetch('http://localhost:5000/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: '🧪 테스트 푸시 알림',
+                body: '3초 후 전송된 급식 알레르기 서버 푸시 테스트입니다!',
+                delay: 3000,
+              }),
+            });
 
-    const period = hourNum < 12 ? '오전' : '오후';
-    const displayHour = hourNum % 12 === 0 ? 12 : hourNum % 12;
-    const timeText = isNotificationEnabled
-      ? `매일 ${period} ${displayHour}시 ${minNum.toString().padStart(2, '0')}분에 알림이 설정되었습니다.`
-      : '알림이 꺼졌습니다.';
-
-    setTimeout(() => {
-      if (Platform.OS === 'web') {
-        alert(`[설정 완료]\n${timeText}`);
+            if (res.ok) {
+              Alert.alert('요청 완료', '3초 후 실제 푸시 알림이 발송됩니다.');
+            } else {
+              setTimeout(() => {
+                new Notification('🧪 테스트 알림 (로컬)', {
+                  body: '급식 알레르기 체커 테스트 알림입니다.',
+                });
+              }, 3000);
+              Alert.alert('안내', '백엔드 서버 미응답으로 로컬 알림이 3초 뒤 동작합니다.');
+            }
+          } catch (e) {
+            setTimeout(() => {
+              new Notification('🧪 테스트 알림 (로컬)', {
+                body: '급식 알레르기 체커 테스트 알림입니다.',
+              });
+            }, 3000);
+            Alert.alert('안내', '로컬 테스트 알림이 3초 뒤에 표시됩니다.');
+          }
+        } else {
+          Alert.alert('권한 필요', '브라우저 알림 권한을 허용해 주세요.');
+        }
       } else {
-        Alert.alert('설정 완료', timeText);
+        Alert.alert('알림 미지원', '이 브라우저는 웹 알림을 지원하지 않습니다.');
       }
-    }, 100);
+    } else {
+      Alert.alert('테스트 알림', '3초 후 테스트 알림이 발송됩니다.');
+    }
   };
 
   const currentProfile = profiles.find((p) => p.id === currentProfileId);
 
+  const parseMealInfo = (rawMealStr: string, userAllergies: number[]) => {
+    const lines = rawMealStr.split('<br/>');
+    return lines
+      .map((line) => {
+        const cleanLine = line.trim();
+        if (!cleanLine) return null;
+
+        const match = cleanLine.match(/^(.*?)\s*\(([\d\.]+)\)$/);
+        let dishName = cleanLine;
+        let allergyNums: number[] = [];
+
+        if (match) {
+          dishName = match[1].trim();
+          allergyNums = match[2]
+            .split('.')
+            .map((n) => parseInt(n, 10))
+            .filter((n) => !isNaN(n));
+        }
+
+        const allergies = allergyNums
+          .map((id) => ALLERGY_LIST.find((a) => a.id === id)?.name)
+          .filter(Boolean) as string[];
+
+        const isDanger = allergyNums.some((id) => userAllergies.includes(id));
+
+        return { dishName, allergies, isDanger };
+      })
+      .filter(Boolean) as MealItem[];
+  };
+
   const fetchMealData = async () => {
     if (!currentProfile) return;
     setLoading(true);
-
-    const targetYmd = selectedDate.replace(/-/g, '');
-    const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&pIndex=1&pSize=5&ATPT_OFCDC_SC_CODE=${currentProfile.ATPT_OFCDC_SC_CODE}&SD_SCHUL_CODE=${currentProfile.SD_SCHUL_CODE}&MLSV_YMD=${targetYmd}`;
-
     try {
-      const response = await fetch(url);
-      const json = await response.json();
+      const ymd = selectedDate.replace(/-/g, '');
+      const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&pIndex=1&pSize=10&ATPT_OFCDC_SC_CODE=${currentProfile.ATPT_OFCDC_SC_CODE}&SD_SCHUL_CODE=${currentProfile.SD_SCHUL_CODE}&MLSV_YMD=${ymd}`;
 
-      if (json.mealServiceDietInfo?.[1]?.row) {
-        const rowData = json.mealServiceDietInfo[1].row;
-        let combinedDish = '';
-        rowData.forEach((item: any) => {
-          combinedDish += item.DDISH_NM + '<br/>';
-        });
+      const res = await fetch(url);
+      const json = await res.json();
 
-        const rawDishes = combinedDish
-          .split('<br/>')
-          .map((d) => d.trim())
-          .filter((d) => d.length > 0);
-
-        const parsedMeals: MealItem[] = rawDishes.map((dishStr) => {
-          const match = dishStr.match(/\(([\d.]+)\)/g);
-          let itemAllergies: string[] = [];
-          let isDanger = false;
-
-          if (match) {
-            match.forEach((m) => {
-              const nums = m.replace(/[()]/g, '').split('.').map(Number);
-              nums.forEach((num) => {
-                if (ALLERGY_MAP[num]) {
-                  if (currentProfile.myAllergies.includes(num)) {
-                    isDanger = true;
-                    if (!itemAllergies.includes(ALLERGY_MAP[num])) {
-                      itemAllergies.push(ALLERGY_MAP[num]);
-                    }
-                  }
-                }
-              });
-            });
-          }
-          const cleanName = dishStr.replace(/\([\d.]+\)/g, '').trim();
-          return { dishName: cleanName, allergies: itemAllergies, isDanger };
-        });
-
-        setMeals(parsedMeals);
+      if (json.mealServiceDietInfo?.[1]?.row?.[0]) {
+        const rawMeal = json.mealServiceDietInfo[1].row[0].DDISH_NM;
+        const parsed = parseMealInfo(rawMeal, currentProfile.myAllergies);
+        setMeals(parsed);
       } else {
         setMeals([]);
       }
     } catch (e) {
-      console.error('급식 불러오기 오류:', e);
+      console.error(e);
       setMeals([]);
     } finally {
       setLoading(false);
@@ -410,68 +330,31 @@ export default function HomeScreen() {
 
   const fetchAllStudentsSummary = async () => {
     setSummaryLoading(true);
-    const targetYmd = selectedDate.replace(/-/g, '');
-    const summaries: StudentRiskSummary[] = [];
+    const summaries: StudentSummary[] = [];
 
-    for (const profile of profiles) {
-      try {
-        const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&pIndex=1&pSize=5&ATPT_OFCDC_SC_CODE=${profile.ATPT_OFCDC_SC_CODE}&SD_SCHUL_CODE=${profile.SD_SCHUL_CODE}&MLSV_YMD=${targetYmd}`;
+    try {
+      const ymd = selectedDate.replace(/-/g, '');
+      for (const p of profiles) {
+        const url = `https://open.neis.go.kr/hub/mealServiceDietInfo?Type=json&pIndex=1&pSize=10&ATPT_OFCDC_SC_CODE=${p.ATPT_OFCDC_SC_CODE}&SD_SCHUL_CODE=${p.SD_SCHUL_CODE}&MLSV_YMD=${ymd}`;
         const res = await fetch(url);
         const json = await res.json();
 
-        if (json.mealServiceDietInfo?.[1]?.row) {
-          const rowData = json.mealServiceDietInfo[1].row;
-          let combinedDish = '';
-          rowData.forEach((item: any) => {
-            combinedDish += item.DDISH_NM + '<br/>';
-          });
+        if (json.mealServiceDietInfo?.[1]?.row?.[0]) {
+          const rawMeal = json.mealServiceDietInfo[1].row[0].DDISH_NM;
+          const parsed = parseMealInfo(rawMeal, p.myAllergies);
+          const dangerItems = parsed.filter((item) => item.isDanger);
 
-          const rawDishes = combinedDish
-            .split('<br/>')
-            .map((d) => d.trim())
-            .filter((d) => d.length > 0);
-
-          const studentDangerItems: { dishName: string; allergies: string[] }[] = [];
-
-          rawDishes.forEach((dishStr) => {
-            const match = dishStr.match(/\(([\d.]+)\)/g);
-            let itemAllergies: string[] = [];
-
-            if (match) {
-              match.forEach((m) => {
-                const nums = m.replace(/[()]/g, '').split('.').map(Number);
-                nums.forEach((num) => {
-                  if (profile.myAllergies.includes(num) && ALLERGY_MAP[num]) {
-                    if (!itemAllergies.includes(ALLERGY_MAP[num])) {
-                      itemAllergies.push(ALLERGY_MAP[num]);
-                    }
-                  }
-                });
-              });
-            }
-
-            if (itemAllergies.length > 0) {
-              const cleanName = dishStr.replace(/\([\d.]+\)/g, '').trim();
-              studentDangerItems.push({
-                dishName: cleanName,
-                allergies: itemAllergies,
-              });
-            }
-          });
-
-          if (studentDangerItems.length > 0) {
-            summaries.push({
-              studentName: profile.name,
-              dangerItems: studentDangerItems,
-            });
+          if (dangerItems.length > 0) {
+            summaries.push({ studentName: p.name, dangerItems });
           }
         }
-      } catch (e) {
-        console.error(`${profile.name} 급식 요약 실패`, e);
       }
+      setStudentSummaries(summaries);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSummaryLoading(false);
     }
-    setStudentSummaries(summaries);
-    setSummaryLoading(false);
   };
 
   const changeDate = (days: number) => {
@@ -483,7 +366,6 @@ export default function HomeScreen() {
     setSelectedDate(`${year}-${month}-${day}`);
   };
 
-  // ✨ 클릭 시 웹은 달력 바로 열기 / 모바일은 모달 오픈
   const handleDatePickerClick = () => {
     if (Platform.OS === 'web') {
       if (webDateInputRef.current) {
@@ -602,12 +484,11 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(-1)}>
             <Text style={styles.dateNavBtnText}>◀ 이전일</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity style={styles.datePickerBtn} onPress={handleDatePickerClick}>
             <Text style={styles.dateText}>📅 {selectedDate}</Text>
             <Text style={styles.dateSubText}>(터치하여 달력 선택)</Text>
 
-            {/* 웹 전용: 클릭 시 즉시 브라우저 달력 팝업 출력 */}
             {Platform.OS === 'web' && (
               <input
                 ref={webDateInputRef}
@@ -738,7 +619,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-     {/* 모달 1: 알림 설정 */}
+      {/* 모달 1: 알림 설정 */}
       <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
         <View style={styles.modalBackdrop}>
           <View style={styles.settingsModalCard}>
@@ -752,7 +633,7 @@ export default function HomeScreen() {
             {isNotificationEnabled && (
               <View style={styles.timePickerContainer}>
                 <Text style={styles.timePickerLabel}>알림을 받을 시간 (24시간 형식 / 예: 00시 40분)</Text>
-                
+
                 <View style={styles.timeDirectInputRow}>
                   <View style={styles.timeInputBlock}>
                     <Text style={styles.timeInputLabel}>시 (00~23)</Text>
@@ -891,16 +772,16 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#ffffff', marginHorizontal: 15, marginTop: 15, padding: 15, borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
-  
+
   addBtn: { backgroundColor: '#27ae60', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   addBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
-  
+
   profileList: { flexDirection: 'row' },
   profileChip: { backgroundColor: '#eef2f5', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
   profileChipSelected: { backgroundColor: '#27ae60' },
   profileChipText: { color: '#7f8c8d', fontSize: 13 },
   profileChipTextSelected: { color: '#ffffff', fontWeight: 'bold' },
-  
+
   dateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   dateNavBtn: { backgroundColor: '#e0e0e0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   dateNavBtnText: { fontSize: 13, fontWeight: 'bold', color: '#333' },
@@ -940,7 +821,7 @@ const styles = StyleSheet.create({
   settingsModalCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15 },
   settingsModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#2c3e50' },
   settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  
+
   calendarModalCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15, alignItems: 'center' },
   calendarTitle: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 10 },
 
@@ -963,7 +844,7 @@ const styles = StyleSheet.create({
   },
   timeColonLarge: { fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 15 },
   selectedTimePreview: { marginTop: 12, fontSize: 13, color: '#007AFF', fontWeight: '600' },
-  
+
   testNotifBtn: { marginTop: 15, backgroundColor: '#eef2f5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
   testNotifBtnText: { fontSize: 12, color: '#555', fontWeight: '600' },
 
