@@ -101,6 +101,32 @@ export default function Index() {
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
 
+  // 프로필 삭제 함수
+  const handleDeleteProfile = async (idToDelete: string) => {
+    if (!confirm('이 프로필을 삭제하시겠습니까?')) return;
+
+    // 1. 화면 및 저장소(localStorage)에서 해당 프로필 제거
+    const updatedProfiles = profiles.filter((profile: any) => profile.id !== idToDelete);
+    setProfiles(updatedProfiles);
+    localStorage.setItem('profiles', JSON.stringify(updatedProfiles));
+
+    // 삭제 후 선택된 프로필 처리 (삭제된 프로필을 보고 있었다면 첫 번째 프로필로 변경)
+    if (currentProfileId === idToDelete) {
+      setCurrentProfileId(updatedProfiles.length > 0 ? updatedProfiles[0].id : '');
+    }
+
+    // 2. 백엔드 서버에 프로필 삭제 요청
+    try {
+      await fetch('https://allergy-alarm.onrender.com/delete-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: idToDelete }),
+      });
+    } catch (error) {
+      console.error('프로필 삭제 요청 중 오류 발생:', error);
+    }
+  };
+
   // 알림 설정 모달 관련
   const [isSettingsModalVisible, setSettingsModalVisible] = useState(false);
   const [isNotificationEnabled, setIsNotificationEnabled] = useState(false);
@@ -467,413 +493,432 @@ export default function Index() {
             return (
               <TouchableOpacity
                 key={p.id}
-                style={[styles.profileChip, isSelected && styles.profileChipSelected]}
-                onPress={() => setCurrentProfileId(p.id)}>
+                style={[
+                  styles.profileChip,
+                  isSelected && styles.profileChipSelected,
+                  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+                ]}
+                onPress={() => setCurrentProfileId(p.id)}
+              >
                 <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
                   {p.name} ({p.schoolName})
                 </Text>
+
+                {/* 🔴 삭제 버튼 (✕) */}
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleDeleteProfile(p.id);
+                  }}
+                  style={{
+                    marginLeft: 4,
+                    paddingHorizontal: 4,
+                    borderRadius: 8,
+                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.3)' : '#ff4d4d',
+                  }}
+                >
+                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✕</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
-      </View>
 
-      {/* 2. 날짜 선택 영역 */}
-      <View style={styles.card}>
-        <View style={styles.dateRow}>
-          <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(-1)}>
-            <Text style={styles.dateNavBtnText}>◀ 이전일</Text>
-          </TouchableOpacity>
+          {/* 2. 날짜 선택 영역 */}
+          <View style={styles.card}>
+            <View style={styles.dateRow}>
+              <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(-1)}>
+                <Text style={styles.dateNavBtnText}>◀ 이전일</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.datePickerBtn} onPress={handleDatePickerClick}>
-            <Text style={styles.dateText}>📅 {selectedDate}</Text>
-            <Text style={styles.dateSubText}>(터치하여 달력 선택)</Text>
+              <TouchableOpacity style={styles.datePickerBtn} onPress={handleDatePickerClick}>
+                <Text style={styles.dateText}>📅 {selectedDate}</Text>
+                <Text style={styles.dateSubText}>(터치하여 달력 선택)</Text>
 
-            {Platform.OS === 'web' && (
-              <input
-                ref={webDateInputRef}
-                type="date"
-                value={selectedDate}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setSelectedDate(e.target.value);
-                  }
-                }}
-                style={{
-                  position: 'absolute',
-                  opacity: 0,
-                  width: '100%',
-                  height: '100%',
-                  top: 0,
-                  left: 0,
-                  cursor: 'pointer',
-                }}
-              />
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(1)}>
-            <Text style={styles.dateNavBtnText}>다음일 ▶</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* 모바일(iOS/Android) 전용 달력 모달 */}
-      {Platform.OS !== 'web' && (
-        <Modal visible={showDatePicker} transparent={true} animationType="fade">
-          <View style={styles.modalBackdrop}>
-            <View style={styles.calendarModalCard}>
-              <Text style={styles.calendarTitle}>📅 날짜 선택</Text>
-
-              <View style={{ alignItems: 'center', marginVertical: 10 }}>
-                <DateTimePicker
-                  value={tempDate}
-                  mode="date"
-                  display="inline"
-                  onChange={(event, date) => {
-                    if (date) setTempDate(date);
-                  }}
-                  style={{ width: 300, height: 320 }}
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
-                <TouchableOpacity
-                  style={[styles.modalBtn, { backgroundColor: '#e0e0e0', flex: 1 }]}
-                  onPress={() => setShowDatePicker(false)}>
-                  <Text style={{ color: '#333', fontWeight: 'bold' }}>취소</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalBtn, { backgroundColor: '#007AFF', flex: 1 }]}
-                  onPress={confirmDateChange}>
-                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>선택 완료</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* 3. 급식 리포트 */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.sectionTitle}>📋 {currentProfile?.name || '학생'}의 급식 점검 리포트</Text>
-          <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsModalVisible(true)}>
-            <Text style={styles.settingsBtnText}>🔔 알림 설정</Text>
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <ActivityIndicator size="large" color="#2ecc71" style={{ marginVertical: 30 }} />
-        ) : meals.length > 0 ? (
-          meals.map((item, index) => (
-            <View key={index} style={[styles.mealCard, item.isDanger ? styles.mealCardDanger : styles.mealCardSafe]}>
-              <View style={styles.mealInfo}>
-                <Text style={styles.dishName}>*{item.dishName}</Text>
-                {item.isDanger && (
-                  <Text style={styles.dangerAllergyText}>
-                    ⚠️ 알레르기 유발 요소: {item.allergies.join(', ')}
-                  </Text>
+                {Platform.OS === 'web' && (
+                  <input
+                    ref={webDateInputRef}
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSelectedDate(e.target.value);
+                      }
+                    }}
+                    style={{
+                      position: 'absolute',
+                      opacity: 0,
+                      width: '100%',
+                      height: '100%',
+                      top: 0,
+                      left: 0,
+                      cursor: 'pointer',
+                    }}
+                  />
                 )}
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.dateNavBtn} onPress={() => changeDate(1)}>
+                <Text style={styles.dateNavBtnText}>다음일 ▶</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 모바일(iOS/Android) 전용 달력 모달 */}
+          {Platform.OS !== 'web' && (
+            <Modal visible={showDatePicker} transparent={true} animationType="fade">
+              <View style={styles.modalBackdrop}>
+                <View style={styles.calendarModalCard}>
+                  <Text style={styles.calendarTitle}>📅 날짜 선택</Text>
+
+                  <View style={{ alignItems: 'center', marginVertical: 10 }}>
+                    <DateTimePicker
+                      value={tempDate}
+                      mode="date"
+                      display="inline"
+                      onChange={(event, date) => {
+                        if (date) setTempDate(date);
+                      }}
+                      style={{ width: 300, height: 320 }}
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+                    <TouchableOpacity
+                      style={[styles.modalBtn, { backgroundColor: '#e0e0e0', flex: 1 }]}
+                      onPress={() => setShowDatePicker(false)}>
+                      <Text style={{ color: '#333', fontWeight: 'bold' }}>취소</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalBtn, { backgroundColor: '#007AFF', flex: 1 }]}
+                      onPress={confirmDateChange}>
+                      <Text style={{ color: '#fff', fontWeight: 'bold' }}>선택 완료</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
-              <View style={[styles.badge, item.isDanger ? styles.badgeDanger : styles.badgeSafe]}>
-                <Text style={styles.badgeText}>{item.isDanger ? '위험' : '안전'}</Text>
+            </Modal>
+          )}
+
+          {/* 3. 급식 리포트 */}
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.sectionTitle}>📋 {currentProfile?.name || '학생'}의 급식 점검 리포트</Text>
+              <TouchableOpacity style={styles.settingsBtn} onPress={() => setSettingsModalVisible(true)}>
+                <Text style={styles.settingsBtnText}>🔔 알림 설정</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loading ? (
+              <ActivityIndicator size="large" color="#2ecc71" style={{ marginVertical: 30 }} />
+            ) : meals.length > 0 ? (
+              meals.map((item, index) => (
+                <View key={index} style={[styles.mealCard, item.isDanger ? styles.mealCardDanger : styles.mealCardSafe]}>
+                  <View style={styles.mealInfo}>
+                    <Text style={styles.dishName}>*{item.dishName}</Text>
+                    {item.isDanger && (
+                      <Text style={styles.dangerAllergyText}>
+                        ⚠️ 알레르기 유발 요소: {item.allergies.join(', ')}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={[styles.badge, item.isDanger ? styles.badgeDanger : styles.badgeSafe]}>
+                    <Text style={styles.badgeText}>{item.isDanger ? '위험' : '안전'}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyText}>해당 날짜에는 등록된 급식 정보가 없습니다.</Text>
+              </View>
+            )}
+          </View>
+
+          {/* 4. 위험 메뉴 종합 안내 */}
+          <View style={[styles.card, styles.summaryCard]}>
+            <Text style={styles.summaryTitle}>🚨 위험 메뉴 종합 정리 안내</Text>
+            <Text style={styles.summarySubTitle}>선택일({selectedDate}) 기준, 위험 성분이 감지된 전체 학생 목록입니다.</Text>
+
+            {summaryLoading ? (
+              <ActivityIndicator size="small" color="#e74c3c" style={{ marginVertical: 10 }} />
+            ) : studentSummaries.length > 0 ? (
+              <View style={styles.summaryContainer}>
+                {studentSummaries.map((summary, idx) => (
+                  <View key={idx} style={styles.summaryRow}>
+                    <Text style={styles.summaryStudentName}>• {summary.studentName} :</Text>
+                    <View style={styles.summaryItemList}>
+                      {summary.dangerItems.map((item, itemIdx) => (
+                        <Text key={itemIdx} style={styles.summaryItemText}>
+                          {item.dishName}
+                          <Text style={styles.summaryAllergyText}>({item.allergies.join(', ')})</Text>
+                          {itemIdx < summary.dangerItems.length - 1 ? ', ' : ''}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.safeSummaryBox}>
+                <Text style={styles.safeSummaryText}>✅ 등록된 모든 학생의 급식에 알레르기 위험 요소가 없습니다.</Text>
+              </View>
+            )}
+          </View>
+
+          {/* 모달 1: 알림 설정 */}
+          <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
+            <View style={styles.modalBackdrop}>
+              <View style={styles.settingsModalCard}>
+                <Text style={styles.settingsModalTitle}>🔔 매일 급식 알림 설정</Text>
+
+                <View style={styles.settingsRow}>
+                  <Text style={{ fontSize: 16, color: '#333', fontWeight: '600' }}>알림 받기 (ON / OFF)</Text>
+                  <Switch value={isNotificationEnabled} onValueChange={setIsNotificationEnabled} />
+                </View>
+
+                {isNotificationEnabled && (
+                  <View style={styles.timePickerContainer}>
+                    <Text style={styles.timePickerLabel}>알림을 받을 시간 (24시간 형식 / 예: 00시 40분)</Text>
+
+                    <View style={styles.timeDirectInputRow}>
+                      <View style={styles.timeInputBlock}>
+                        <Text style={styles.timeInputLabel}>시 (00~23)</Text>
+                        <TextInput
+                          style={styles.timeNumberInput}
+                          keyboardType="number-pad"
+                          maxLength={2}
+                          value={inputHour}
+                          onChangeText={(text) => setInputHour(text.replace(/[^0-9]/g, ''))}
+                          placeholder="00"
+                        />
+                      </View>
+
+                      <Text style={styles.timeColonLarge}>:</Text>
+
+                      <View style={styles.timeInputBlock}>
+                        <Text style={styles.timeInputLabel}>분 (00~59)</Text>
+                        <TextInput
+                          style={styles.timeNumberInput}
+                          keyboardType="number-pad"
+                          maxLength={2}
+                          value={inputMinute}
+                          onChangeText={(text) => setInputMinute(text.replace(/[^0-9]/g, ''))}
+                          placeholder="40"
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={styles.selectedTimePreview}>
+                      설정 예정: {parseInt(inputHour || '0', 10) < 12 ? '오전' : '오후'}{' '}
+                      {parseInt(inputHour || '0', 10) % 12 === 0 ? 12 : parseInt(inputHour || '0', 10) % 12}시{' '}
+                      {String(parseInt(inputMinute || '0', 10)).padStart(2, '0')}분
+                    </Text>
+
+                    <TouchableOpacity style={styles.testNotifBtn} onPress={triggerTestNotification}>
+                      <Text style={styles.testNotifBtnText}>🧪 테스트 알림 확인하기</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity style={styles.saveSettingsBtn} onPress={handleSaveSettings}>
+                    <Text style={styles.saveSettingsBtnText}>저장하기</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.closeSettingsBtn} onPress={() => setSettingsModalVisible(false)}>
+                    <Text style={styles.closeSettingsBtnText}>취소</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          ))
-        ) : (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>해당 날짜에는 등록된 급식 정보가 없습니다.</Text>
-          </View>
-        )}
-      </View>
+          </Modal>
 
-      {/* 4. 위험 메뉴 종합 안내 */}
-      <View style={[styles.card, styles.summaryCard]}>
-        <Text style={styles.summaryTitle}>🚨 위험 메뉴 종합 정리 안내</Text>
-        <Text style={styles.summarySubTitle}>선택일({selectedDate}) 기준, 위험 성분이 감지된 전체 학생 목록입니다.</Text>
+          {/* 모달 2: 프로필 추가 */}
+          <Modal visible={isModalOpen} animationType="slide" transparent={false}>
+            <ScrollView style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>학생 / 자녀 프로필 추가</Text>
 
-        {summaryLoading ? (
-          <ActivityIndicator size="small" color="#e74c3c" style={{ marginVertical: 10 }} />
-        ) : studentSummaries.length > 0 ? (
-          <View style={styles.summaryContainer}>
-            {studentSummaries.map((summary, idx) => (
-              <View key={idx} style={styles.summaryRow}>
-                <Text style={styles.summaryStudentName}>• {summary.studentName} :</Text>
-                <View style={styles.summaryItemList}>
-                  {summary.dangerItems.map((item, itemIdx) => (
-                    <Text key={itemIdx} style={styles.summaryItemText}>
-                      {item.dishName}
-                      <Text style={styles.summaryAllergyText}>({item.allergies.join(', ')})</Text>
-                      {itemIdx < summary.dangerItems.length - 1 ? ', ' : ''}
-                    </Text>
+              <Text style={styles.label}>1. 학생/자녀 이름</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="예: 김도형"
+                value={newStudentName}
+                onChangeText={setNewStudentName}
+              />
+
+              <Text style={styles.label}>2. 학교 검색</Text>
+              <View style={styles.searchRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                  placeholder="학교명 입력 (예: 호명초)"
+                  value={searchSchoolQuery}
+                  onChangeText={setSearchSchoolQuery}
+                />
+                <TouchableOpacity style={styles.searchBtn} onPress={searchSchool}>
+                  <Text style={styles.searchBtnText}>검색</Text>
+                </TouchableOpacity>
+              </View>
+
+              {searchResults.length > 0 && (
+                <View style={styles.searchResultsBox}>
+                  {searchResults.map((item) => (
+                    <TouchableOpacity
+                      key={item.SD_SCHUL_CODE}
+                      style={[
+                        styles.searchItem,
+                        selectedSchool?.SD_SCHUL_CODE === item.SD_SCHUL_CODE && styles.searchItemSelected,
+                      ]}
+                      onPress={() => setSelectedSchool(item)}>
+                      <Text style={styles.schoolNameText}>{item.SCHUL_NM}</Text>
+                      <Text style={styles.schoolAddrText}>{item.ORG_RDNMA || item.LCTN_SC_NM}</Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
+              )}
+
+              {selectedSchool && (
+                <Text style={styles.selectedSchoolBadge}>선택된 학교: {selectedSchool.SCHUL_NM}</Text>
+              )}
+
+              <Text style={styles.label}>3. 보유 알레르기 선택 (다중 선택 가능)</Text>
+              <View style={styles.allergyGrid}>
+                {ALLERGY_LIST.map((item) => {
+                  const isChecked = selectedAllergies.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.allergyChip, isChecked && styles.allergyChipSelected]}
+                      onPress={() => toggleAllergy(item.id)}>
+                      <Text style={[styles.allergyChipText, isChecked && styles.allergyChipTextSelected]}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-            ))}
-          </View>
-        ) : (
-          <View style={styles.safeSummaryBox}>
-            <Text style={styles.safeSummaryText}>✅ 등록된 모든 학생의 급식에 알레르기 위험 요소가 없습니다.</Text>
-          </View>
-        )}
-      </View>
 
-      {/* 모달 1: 알림 설정 */}
-      <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.settingsModalCard}>
-            <Text style={styles.settingsModalTitle}>🔔 매일 급식 알림 설정</Text>
-
-            <View style={styles.settingsRow}>
-              <Text style={{ fontSize: 16, color: '#333', fontWeight: '600' }}>알림 받기 (ON / OFF)</Text>
-              <Switch value={isNotificationEnabled} onValueChange={setIsNotificationEnabled} />
-            </View>
-
-            {isNotificationEnabled && (
-              <View style={styles.timePickerContainer}>
-                <Text style={styles.timePickerLabel}>알림을 받을 시간 (24시간 형식 / 예: 00시 40분)</Text>
-
-                <View style={styles.timeDirectInputRow}>
-                  <View style={styles.timeInputBlock}>
-                    <Text style={styles.timeInputLabel}>시 (00~23)</Text>
-                    <TextInput
-                      style={styles.timeNumberInput}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                      value={inputHour}
-                      onChangeText={(text) => setInputHour(text.replace(/[^0-9]/g, ''))}
-                      placeholder="00"
-                    />
-                  </View>
-
-                  <Text style={styles.timeColonLarge}>:</Text>
-
-                  <View style={styles.timeInputBlock}>
-                    <Text style={styles.timeInputLabel}>분 (00~59)</Text>
-                    <TextInput
-                      style={styles.timeNumberInput}
-                      keyboardType="number-pad"
-                      maxLength={2}
-                      value={inputMinute}
-                      onChangeText={(text) => setInputMinute(text.replace(/[^0-9]/g, ''))}
-                      placeholder="40"
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.selectedTimePreview}>
-                  설정 예정: {parseInt(inputHour || '0', 10) < 12 ? '오전' : '오후'}{' '}
-                  {parseInt(inputHour || '0', 10) % 12 === 0 ? 12 : parseInt(inputHour || '0', 10) % 12}시{' '}
-                  {String(parseInt(inputMinute || '0', 10)).padStart(2, '0')}분
-                </Text>
-
-                <TouchableOpacity style={styles.testNotifBtn} onPress={triggerTestNotification}>
-                  <Text style={styles.testNotifBtnText}>🧪 테스트 알림 확인하기</Text>
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn, { marginRight: 10 }]} onPress={() => setIsModalOpen(false)}>
+                  <Text style={styles.modalBtnText}>취소</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleSaveProfile}>
+                  <Text style={styles.modalBtnText}>저장하기</Text>
                 </TouchableOpacity>
               </View>
-            )}
-
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-              <TouchableOpacity style={styles.saveSettingsBtn} onPress={handleSaveSettings}>
-                <Text style={styles.saveSettingsBtnText}>저장하기</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.closeSettingsBtn} onPress={() => setSettingsModalVisible(false)}>
-                <Text style={styles.closeSettingsBtnText}>취소</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 모달 2: 프로필 추가 */}
-      <Modal visible={isModalOpen} animationType="slide" transparent={false}>
-        <ScrollView style={styles.modalContainer}>
-          <Text style={styles.modalTitle}>학생 / 자녀 프로필 추가</Text>
-
-          <Text style={styles.label}>1. 학생/자녀 이름</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="예: 김도형"
-            value={newStudentName}
-            onChangeText={setNewStudentName}
-          />
-
-          <Text style={styles.label}>2. 학교 검색</Text>
-          <View style={styles.searchRow}>
-            <TextInput
-              style={[styles.input, { flex: 1, marginBottom: 0 }]}
-              placeholder="학교명 입력 (예: 호명초)"
-              value={searchSchoolQuery}
-              onChangeText={setSearchSchoolQuery}
-            />
-            <TouchableOpacity style={styles.searchBtn} onPress={searchSchool}>
-              <Text style={styles.searchBtnText}>검색</Text>
-            </TouchableOpacity>
-          </View>
-
-          {searchResults.length > 0 && (
-            <View style={styles.searchResultsBox}>
-              {searchResults.map((item) => (
-                <TouchableOpacity
-                  key={item.SD_SCHUL_CODE}
-                  style={[
-                    styles.searchItem,
-                    selectedSchool?.SD_SCHUL_CODE === item.SD_SCHUL_CODE && styles.searchItemSelected,
-                  ]}
-                  onPress={() => setSelectedSchool(item)}>
-                  <Text style={styles.schoolNameText}>{item.SCHUL_NM}</Text>
-                  <Text style={styles.schoolAddrText}>{item.ORG_RDNMA || item.LCTN_SC_NM}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {selectedSchool && (
-            <Text style={styles.selectedSchoolBadge}>선택된 학교: {selectedSchool.SCHUL_NM}</Text>
-          )}
-
-          <Text style={styles.label}>3. 보유 알레르기 선택 (다중 선택 가능)</Text>
-          <View style={styles.allergyGrid}>
-            {ALLERGY_LIST.map((item) => {
-              const isChecked = selectedAllergies.includes(item.id);
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.allergyChip, isChecked && styles.allergyChipSelected]}
-                  onPress={() => toggleAllergy(item.id)}>
-                  <Text style={[styles.allergyChipText, isChecked && styles.allergyChipTextSelected]}>
-                    {item.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          <View style={styles.modalBtnRow}>
-            <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn, { marginRight: 10 }]} onPress={() => setIsModalOpen(false)}>
-              <Text style={styles.modalBtnText}>취소</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalBtn, styles.saveBtn]} onPress={handleSaveProfile}>
-              <Text style={styles.modalBtnText}>저장하기</Text>
-            </TouchableOpacity>
-          </View>
+            </ScrollView>
+          </Modal>
         </ScrollView>
-      </Modal>
-    </ScrollView>
-  );
+        );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f4f6f8' },
-  header: { paddingTop: 50, paddingBottom: 12, backgroundColor: '#ffffff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50' },
-  versionText: { fontSize: 11, color: '#95a5a6', marginTop: 2 },
-  card: { backgroundColor: '#ffffff', marginHorizontal: 15, marginTop: 15, padding: 15, borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
-  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
+        const styles = StyleSheet.create({
+          container: {flex: 1, backgroundColor: '#f4f6f8' },
+        header: {paddingTop: 50, paddingBottom: 12, backgroundColor: '#ffffff', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#e1e4e8' },
+        headerTitle: {fontSize: 20, fontWeight: 'bold', color: '#2c3e50' },
+        versionText: {fontSize: 11, color: '#95a5a6', marginTop: 2 },
+        card: {backgroundColor: '#ffffff', marginHorizontal: 15, marginTop: 15, padding: 15, borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
+        cardHeaderRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+        sectionTitle: {fontSize: 16, fontWeight: 'bold', color: '#2c3e50' },
 
-  addBtn: { backgroundColor: '#27ae60', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  addBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+        addBtn: {backgroundColor: '#27ae60', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+        addBtnText: {color: '#fff', fontSize: 12, fontWeight: 'bold' },
 
-  profileList: { flexDirection: 'row' },
-  profileChip: { backgroundColor: '#eef2f5', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
-  profileChipSelected: { backgroundColor: '#27ae60' },
-  profileChipText: { color: '#7f8c8d', fontSize: 13 },
-  profileChipTextSelected: { color: '#ffffff', fontWeight: 'bold' },
+        profileList: {flexDirection: 'row' },
+        profileChip: {backgroundColor: '#eef2f5', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8 },
+        profileChipSelected: {backgroundColor: '#27ae60' },
+        profileChipText: {color: '#7f8c8d', fontSize: 13 },
+        profileChipTextSelected: {color: '#ffffff', fontWeight: 'bold' },
 
-  dateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  dateNavBtn: { backgroundColor: '#e0e0e0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  dateNavBtnText: { fontSize: 13, fontWeight: 'bold', color: '#333' },
-  datePickerBtn: { alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, position: 'relative' },
-  dateText: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50' },
-  dateSubText: { fontSize: 11, color: '#7f8c8d' },
+        dateRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+        dateNavBtn: {backgroundColor: '#e0e0e0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+        dateNavBtnText: {fontSize: 13, fontWeight: 'bold', color: '#333' },
+        datePickerBtn: {alignItems: 'center', paddingHorizontal: 10, paddingVertical: 4, position: 'relative' },
+        dateText: {fontSize: 18, fontWeight: 'bold', color: '#2c3e50' },
+        dateSubText: {fontSize: 11, color: '#7f8c8d' },
 
-  settingsBtn: { backgroundColor: '#FFA500', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 },
-  settingsBtnText: { color: '#fff', fontSize: 13, fontWeight: 'bold' },
+        settingsBtn: {backgroundColor: '#FFA500', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 },
+        settingsBtnText: {color: '#fff', fontSize: 13, fontWeight: 'bold' },
 
-  mealCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 },
-  mealCardSafe: { backgroundColor: '#f2f9f4' },
-  mealCardDanger: { backgroundColor: '#fdf2f2' },
-  mealInfo: { flex: 1, paddingRight: 10 },
-  dishName: { fontSize: 15, fontWeight: 'bold', color: '#2c3e50' },
-  dangerAllergyText: { fontSize: 12, color: '#e74c3c', marginTop: 4, fontWeight: '600' },
-  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  badgeSafe: { backgroundColor: '#a3e4d7' },
-  badgeDanger: { backgroundColor: '#f5b7b1' },
-  badgeText: { fontSize: 12, fontWeight: 'bold', color: '#2c3e50' },
-  emptyBox: { paddingVertical: 30, alignItems: 'center' },
-  emptyText: { color: '#95a5a6', fontSize: 14 },
+        mealCard: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 8, marginBottom: 8 },
+        mealCardSafe: {backgroundColor: '#f2f9f4' },
+        mealCardDanger: {backgroundColor: '#fdf2f2' },
+        mealInfo: {flex: 1, paddingRight: 10 },
+        dishName: {fontSize: 15, fontWeight: 'bold', color: '#2c3e50' },
+        dangerAllergyText: {fontSize: 12, color: '#e74c3c', marginTop: 4, fontWeight: '600' },
+        badge: {paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+        badgeSafe: {backgroundColor: '#a3e4d7' },
+        badgeDanger: {backgroundColor: '#f5b7b1' },
+        badgeText: {fontSize: 12, fontWeight: 'bold', color: '#2c3e50' },
+        emptyBox: {paddingVertical: 30, alignItems: 'center' },
+        emptyText: {color: '#95a5a6', fontSize: 14 },
 
-  summaryCard: { borderLeftWidth: 5, borderLeftColor: '#e74c3c', backgroundColor: '#fff9f9' },
-  summaryTitle: { fontSize: 16, fontWeight: 'bold', color: '#c0392b', marginBottom: 4 },
-  summarySubTitle: { fontSize: 12, color: '#7f8c8d', marginBottom: 10 },
-  summaryContainer: { backgroundColor: '#ffffff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#f5c6cb' },
-  summaryRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  summaryStudentName: { fontSize: 14, fontWeight: 'bold', color: '#2c3e50', marginRight: 6 },
-  summaryItemList: { flex: 1, flexDirection: 'row', flexWrap: 'wrap' },
-  summaryItemText: { fontSize: 14, color: '#c0392b', fontWeight: '600' },
-  summaryAllergyText: { fontSize: 13, color: '#e74c3c', fontWeight: 'normal' },
-  safeSummaryBox: { backgroundColor: '#e8f8f5', padding: 10, borderRadius: 8, alignItems: 'center' },
-  safeSummaryText: { color: '#27ae60', fontSize: 13, fontWeight: 'bold' },
+        summaryCard: {borderLeftWidth: 5, borderLeftColor: '#e74c3c', backgroundColor: '#fff9f9' },
+        summaryTitle: {fontSize: 16, fontWeight: 'bold', color: '#c0392b', marginBottom: 4 },
+        summarySubTitle: {fontSize: 12, color: '#7f8c8d', marginBottom: 10 },
+        summaryContainer: {backgroundColor: '#ffffff', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#f5c6cb' },
+        summaryRow: {flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
+        summaryStudentName: {fontSize: 14, fontWeight: 'bold', color: '#2c3e50', marginRight: 6 },
+        summaryItemList: {flex: 1, flexDirection: 'row', flexWrap: 'wrap' },
+        summaryItemText: {fontSize: 14, color: '#c0392b', fontWeight: '600' },
+        summaryAllergyText: {fontSize: 13, color: '#e74c3c', fontWeight: 'normal' },
+        safeSummaryBox: {backgroundColor: '#e8f8f5', padding: 10, borderRadius: 8, alignItems: 'center' },
+        safeSummaryText: {color: '#27ae60', fontSize: 13, fontWeight: 'bold' },
 
-  modalBackdrop: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
-  settingsModalCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15 },
-  settingsModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#2c3e50' },
-  settingsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
+        modalBackdrop: {flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)', padding: 20 },
+        settingsModalCard: {width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15 },
+        settingsModalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 20, textAlign: 'center', color: '#2c3e50' },
+        settingsRow: {flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
 
-  calendarModalCard: { width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15, alignItems: 'center' },
-  calendarTitle: { fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 10 },
+        calendarModalCard: {width: '100%', maxWidth: 340, backgroundColor: '#fff', padding: 20, borderRadius: 15, alignItems: 'center' },
+        calendarTitle: {fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 10 },
 
-  timePickerContainer: { marginBottom: 20, alignItems: 'center' },
-  timePickerLabel: { fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 15, textAlign: 'center' },
-  timeDirectInputRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  timeInputBlock: { alignItems: 'center' },
-  timeInputLabel: { fontSize: 11, color: '#888', marginBottom: 4 },
-  timeNumberInput: {
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    borderRadius: 8,
-    width: 65,
-    height: 48,
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    backgroundColor: '#f8fafc',
+        timePickerContainer: {marginBottom: 20, alignItems: 'center' },
+        timePickerLabel: {fontSize: 12, fontWeight: 'bold', color: '#555', marginBottom: 15, textAlign: 'center' },
+        timeDirectInputRow: {flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+        timeInputBlock: {alignItems: 'center' },
+        timeInputLabel: {fontSize: 11, color: '#888', marginBottom: 4 },
+        timeNumberInput: {
+          borderWidth: 1,
+        borderColor: '#007AFF',
+        borderRadius: 8,
+        width: 65,
+        height: 48,
+        textAlign: 'center',
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#2c3e50',
+        backgroundColor: '#f8fafc',
   },
-  timeColonLarge: { fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 15 },
-  selectedTimePreview: { marginTop: 12, fontSize: 13, color: '#007AFF', fontWeight: '600' },
+        timeColonLarge: {fontSize: 24, fontWeight: 'bold', color: '#333', marginTop: 15 },
+        selectedTimePreview: {marginTop: 12, fontSize: 13, color: '#007AFF', fontWeight: '600' },
 
-  testNotifBtn: { marginTop: 15, backgroundColor: '#eef2f5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  testNotifBtnText: { fontSize: 12, color: '#555', fontWeight: '600' },
+        testNotifBtn: {marginTop: 15, backgroundColor: '#eef2f5', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+        testNotifBtnText: {fontSize: 12, color: '#555', fontWeight: '600' },
 
-  saveSettingsBtn: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
-  saveSettingsBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },
-  closeSettingsBtn: { backgroundColor: '#e0e0e0', paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
-  closeSettingsBtnText: { color: '#444', fontWeight: 'bold', fontSize: 15 },
+        saveSettingsBtn: {backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
+        saveSettingsBtnText: {color: '#fff', fontWeight: 'bold', fontSize: 15 },
+        closeSettingsBtn: {backgroundColor: '#e0e0e0', paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
+        closeSettingsBtnText: {color: '#444', fontWeight: 'bold', fontSize: 15 },
 
-  modalContainer: { flex: 1, padding: 20, paddingTop: 50, backgroundColor: '#fff' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50', marginBottom: 20, textAlign: 'center' },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#34495e', marginTop: 15, marginBottom: 8 },
-  input: { borderWidth: 1, borderColor: '#bdc3c7', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
-  searchRow: { flexDirection: 'row', alignItems: 'center' },
-  searchBtn: { backgroundColor: '#3498db', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 8, marginLeft: 8 },
-  searchBtnText: { color: '#fff', fontWeight: 'bold' },
-  searchResultsBox: { maxHeight: 150, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8, marginTop: 5 },
-  searchItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f1f1' },
-  searchItemSelected: { backgroundColor: '#e8f8f5' },
-  schoolNameText: { fontSize: 14, fontWeight: 'bold' },
-  schoolAddrText: { fontSize: 11, color: '#7f8c8d' },
-  selectedSchoolBadge: { marginTop: 8, color: '#27ae60', fontWeight: 'bold' },
-  allergyGrid: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 5 },
-  allergyChip: { borderWidth: 1, borderColor: '#bdc3c7', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, margin: 4 },
-  allergyChipSelected: { backgroundColor: '#e74c3c', borderColor: '#e74c3c' },
-  allergyChipText: { fontSize: 12, color: '#7f8c8d' },
-  allergyChipTextSelected: { color: '#ffffff', fontWeight: 'bold' },
-  modalBtnRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 30, marginBottom: 50 },
-  modalBtn: { paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
-  cancelBtn: { backgroundColor: '#95a5a6' },
-  saveBtn: { backgroundColor: '#27ae60' },
-  modalBtnText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+        modalContainer: {flex: 1, padding: 20, paddingTop: 50, backgroundColor: '#fff' },
+        modalTitle: {fontSize: 20, fontWeight: 'bold', color: '#2c3e50', marginBottom: 20, textAlign: 'center' },
+        label: {fontSize: 14, fontWeight: 'bold', color: '#34495e', marginTop: 15, marginBottom: 8 },
+        input: {borderWidth: 1, borderColor: '#bdc3c7', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+        searchRow: {flexDirection: 'row', alignItems: 'center' },
+        searchBtn: {backgroundColor: '#3498db', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 8, marginLeft: 8 },
+        searchBtnText: {color: '#fff', fontWeight: 'bold' },
+        searchResultsBox: {maxHeight: 150, borderWidth: 1, borderColor: '#e1e4e8', borderRadius: 8, marginTop: 5 },
+        searchItem: {padding: 10, borderBottomWidth: 1, borderBottomColor: '#f1f1f1' },
+        searchItemSelected: {backgroundColor: '#e8f8f5' },
+        schoolNameText: {fontSize: 14, fontWeight: 'bold' },
+        schoolAddrText: {fontSize: 11, color: '#7f8c8d' },
+        selectedSchoolBadge: {marginTop: 8, color: '#27ae60', fontWeight: 'bold' },
+        allergyGrid: {flexDirection: 'row', flexWrap: 'wrap', marginTop: 5 },
+        allergyChip: {borderWidth: 1, borderColor: '#bdc3c7', borderRadius: 15, paddingHorizontal: 10, paddingVertical: 6, margin: 4 },
+        allergyChipSelected: {backgroundColor: '#e74c3c', borderColor: '#e74c3c' },
+        allergyChipText: {fontSize: 12, color: '#7f8c8d' },
+        allergyChipTextSelected: {color: '#ffffff', fontWeight: 'bold' },
+        modalBtnRow: {flexDirection: 'row', justifyContent: 'space-between', marginTop: 30, marginBottom: 50 },
+        modalBtn: {paddingVertical: 12, borderRadius: 8, alignItems: 'center', flex: 1 },
+        cancelBtn: {backgroundColor: '#95a5a6' },
+        saveBtn: {backgroundColor: '#27ae60' },
+        modalBtnText: {color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

@@ -45,6 +45,23 @@ app.post('/send-notification', (req, res) => {
   const { title, body, delay } = req.body;
   const payload = JSON.stringify({ title, body });
 
+  // 프로필 삭제 API
+app.post('/delete-profile', (req, res) => {
+  const { id } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ success: false, message: '프로필 ID가 필요합니다.' });
+  }
+
+  // 서버에 저장된 구독 정보 중 해당 프로필 ID 제거
+  if (typeof subscriptions !== 'undefined') {
+    subscriptions = subscriptions.filter(sub => sub.id !== id);
+  }
+
+  console.log(`🗑️ 프로필 삭제 완료: ID ${id}`);
+  return res.status(200).json({ success: true, message: '프로필이 성공적으로 삭제되었습니다.' });
+});
+
   console.log(`⏰ ${delay / 1000}초 뒤 알림 전송 예약...`);
   setTimeout(() => {
     sendPushToAll(payload);
