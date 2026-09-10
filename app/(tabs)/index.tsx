@@ -522,6 +522,8 @@ export default function Index() {
               </TouchableOpacity>
             );
           })}
+        </ScrollView> 
+        </View>
 
           {/* 2. 날짜 선택 영역 */}
           <View style={styles.card}>
