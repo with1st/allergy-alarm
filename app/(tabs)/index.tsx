@@ -185,7 +185,7 @@ export default function Index() {
         await subscribeToPush();
 
         // 백엔드 서버로 설정된 알림 시간 전송
-        await fetch('http://localhost:5000/set-time', {
+        await fetch('https://allergy-alarm.onrender.com/set-time', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -213,7 +213,7 @@ export default function Index() {
             applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
           });
         }
-        await fetch('http://localhost:5000/subscribe', {
+        await fetch('https://allergy-alarm.onrender.com/subscribe', {
           method: 'POST',
           body: JSON.stringify(subscription),
           headers: { 'Content-Type': 'application/json' },
@@ -232,7 +232,7 @@ export default function Index() {
           // 서버 발송 전 구독 정보 최신화
           await subscribeToPush();
           try {
-            const res = await fetch('http://localhost:5000/send-notification', {
+            const res = await fetch('https://allergy-alarm.onrender.com/send-notification', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
