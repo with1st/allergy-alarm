@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 
-const CURRENT_APP_VERSION = '1.0.1';
+const CURRENT_APP_VERSION = '1.0.4';
 const VAPID_PUBLIC_KEY = 'BIMm5K3reoqNavT0h6W4vRHNWIUs0Dl9r6gPKxeD15gVwm58TIt2v_U4CH1Q0E_4h1QZGbfkhEX9eDJafd1_ivY';
 
 // base64 문자열을 Uint8Array로 변환하는 헬퍼 함수
