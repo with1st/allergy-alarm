@@ -65,6 +65,8 @@ interface Profile {
   ATPT_OFCDC_SC_CODE: string;
   SD_SCHUL_CODE: string;
   myAllergies: number[];
+  standardSymptoms?: string[]; 
+  customSymptomNote?: string; 
 }
 
 interface MealItem {
@@ -77,6 +79,14 @@ interface StudentSummary {
   studentName: string;
   dangerItems: MealItem[];
 }
+
+const STANDARD_SYMPTOMS = [
+  '피부 가려움/두드러기',
+  '입술/얼굴 부종',
+  '기침/호흡곤란',
+  '복통/구토/설사',
+  '어지러움/두통',
+];
 
 export default function Index() {
   const { width } = useWindowDimensions();
@@ -104,6 +114,15 @@ export default function Index() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [customSymptomNote, setCustomSymptomNote] = useState<string>('');
+  const toggleSymptom = (symptom: string) => {
+    if (selectedSymptoms.includes(symptom)) {
+      setSelectedSymptoms(selectedSymptoms.filter((s) => s !== symptom));
+    } else {
+      setSelectedSymptoms([...selectedSymptoms, symptom]);
+    }
+  };
 
   // 프로필 삭제 함수
   const handleDeleteProfile = async (idToDelete: string) => {
@@ -462,6 +481,8 @@ export default function Index() {
       ATPT_OFCDC_SC_CODE: selectedSchool.ATPT_OFCDC_SC_CODE,
       SD_SCHUL_CODE: selectedSchool.SD_SCHUL_CODE,
       myAllergies: selectedAllergies,
+      standardSymptoms: selectedSymptoms,   
+      customSymptomNote: customSymptomNote, 
     };
     const updated = [...profiles, newProfile];
     saveProfiles(updated);
@@ -473,6 +494,8 @@ export default function Index() {
     setSearchSchoolQuery('');
     setSearchResults([]);
     setSelectedAllergies([]);
+    setSelectedSymptoms([]);
+    setCustomSymptomNote('');
   };
 
   return (
@@ -803,6 +826,51 @@ export default function Index() {
                   );
                 })}
               </View>
+
+{/* 4. 알레르기 주요 증상 선택 */}
+        <Text style={[styles.label, { marginTop: 15 }]}>4. 주요 증상 선택 (다중 선택 가능)</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+          {STANDARD_SYMPTOMS.map((symptom) => {
+            const isSelected = selectedSymptoms.includes(symptom);
+            return (
+              <TouchableOpacity
+                key={symptom}
+                onPress={() => toggleSymptom(symptom)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 15,
+                  backgroundColor: isSelected ? '#ff6b6b' : '#f0f0f0',
+                  marginRight: 6,
+                  marginBottom: 6,
+                }}
+              >
+                <Text style={{ color: isSelected ? '#fff' : '#333', fontSize: 13 }}>
+                  {isSelected ? '✓ ' : ''}{symptom}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* 5. 학생별 특이 반응 / 메모 */}
+        <Text style={[styles.label, { marginTop: 10 }]}>5. 학생별 특이 반응 / 상세 메모</Text>
+        <TextInput
+          style={{
+            borderWidth: 1,
+            borderColor: '#ccc',
+            borderRadius: 8,
+            padding: 10,
+            fontSize: 14,
+            minHeight: 60,
+            backgroundColor: '#fff',
+            marginBottom: 15,
+          }}
+          placeholder="예: 익힌 계란은 먹을 수 있으나 날계란은 가려움증 유발"
+          multiline
+          value={customSymptomNote}
+          onChangeText={setCustomSymptomNote}
+        />
 
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn, { marginRight: 10 }]} onPress={() => setIsModalOpen(false)}>
