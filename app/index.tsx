@@ -137,6 +137,7 @@ export default function Index() {
   // 프로필 상세 보기 모달 관련 State
    const [detailProfile, setDetailProfile] = useState<Profile | null>(null);
    const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+   const [isProfileListModalOpen, setIsProfileListModalOpen] = useState<boolean>(false);
 
    const handleOpenDetail = (profile: Profile) => {
     setDetailProfile(profile);
@@ -547,10 +548,7 @@ export default function Index() {
                   isSelected && styles.profileChipSelected,
                   { flexDirection: 'row', alignItems: 'center', gap: 6 },
                 ]}
-                onPress={() => {
-                  setCurrentProfileId(p.id);
-                  handleOpenDetail(p);
-                }}
+                onPress={() => setCurrentProfileId(p.id)}
               >
                 <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
                   {p.name} ({p.schoolName})
@@ -574,7 +572,26 @@ export default function Index() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView> 
+        </ScrollView>
+
+        <TouchableOpacity
+          onPress={() => setIsProfileListModalOpen(true)}
+          style={{
+            backgroundColor: '#fff',
+            borderColor: '#4a90e2',
+            borderWidth: 1,
+            paddingVertical: 10,
+            paddingHorizontal: 15,
+            borderRadius: 8,
+            alignItems: 'center',
+            marginTop: 10,
+          }}
+        >
+          <Text style={{ color: '#4a90e2', fontWeight: 'bold', fontSize: 14 }}>
+            📋 등록된 학생 알레르기/증상 목록 확인
+          </Text>
+        </TouchableOpacity>
+         
         </View>
 
           {/* 2. 날짜 선택 영역 */}
@@ -955,6 +972,55 @@ export default function Index() {
               style={{ backgroundColor: '#4a90e2', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* 1. 전체 학생 등록 목록 모달 */}
+      <Modal visible={isProfileListModalOpen} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 500, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#333' }}>
+              📋 등록 학생 목록
+            </Text>
+            
+            <ScrollView>
+              {profiles.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: '#888', marginVertical: 20 }}>
+                  등록된 학생이 없습니다.
+                </Text>
+              ) : (
+                profiles.map((p) => (
+                  <TouchableOpacity
+                    key={p.id}
+                    onPress={() => {
+                      handleOpenDetail(p);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#eee',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>{p.name}</Text>
+                      <Text style={{ fontSize: 13, color: '#666', marginTop: 2 }}>{p.schoolName}</Text>
+                    </View>
+                    <Text style={{ fontSize: 14, color: '#4a90e2', fontWeight: 'bold' }}>상세보기 ➔</Text>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              onPress={() => setIsProfileListModalOpen(false)}
+              style={{ backgroundColor: '#6c757d', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
