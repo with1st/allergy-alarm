@@ -140,9 +140,10 @@ export default function Index() {
    const [isProfileListModalOpen, setIsProfileListModalOpen] = useState<boolean>(false);
 
    const handleOpenDetail = (profile: Profile) => {
-    setDetailProfile(profile);
-    setIsDetailModalOpen(true);
-  };
+     setIsProfileListModalOpen(false); // 👈 1. 목록 모달 닫기 추가
+     setDetailProfile(profile);
+     setIsDetailModalOpen(true);       // 2. 상세 모달 열기
+};
 
   // 프로필 삭제 함수
   const handleDeleteProfile = async (idToDelete: string) => {
