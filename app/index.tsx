@@ -13,6 +13,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 
 const CURRENT_APP_VERSION = '1.0.4';
@@ -78,6 +79,9 @@ interface StudentSummary {
 }
 
 export default function Index() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768
+
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [currentProfileId, setCurrentProfileId] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -472,7 +476,10 @@ export default function Index() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 50 }}>
+    <ScrollView 
+  style={[styles.container, { maxWidth: 768, width: '100%', alignSelf: 'center' }]} 
+  contentContainerStyle={{ paddingBottom: 50 }}
+>
       {/* 헤더 */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>🥗 급식 알레르기 체커</Text>
