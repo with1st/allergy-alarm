@@ -134,6 +134,14 @@ export default function Index() {
       setSelectedSymptoms([...selectedSymptoms, symptom]);
     }
   };
+  // 프로필 상세 보기 모달 관련 State
+   const [detailProfile, setDetailProfile] = useState<Profile | null>(null);
+   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
+
+   const handleOpenDetail = (profile: Profile) => {
+    setDetailProfile(profile);
+    setIsDetailModalOpen(true);
+  };
 
   // 프로필 삭제 함수
   const handleDeleteProfile = async (idToDelete: string) => {
@@ -539,7 +547,10 @@ export default function Index() {
                   isSelected && styles.profileChipSelected,
                   { flexDirection: 'row', alignItems: 'center', gap: 6 },
                 ]}
-                onPress={() => setCurrentProfileId(p.id)}
+                onPress={() => {
+                  setCurrentProfileId(p.id);
+                  handleOpenDetail(p);
+                }}
               >
                 <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
                   {p.name} ({p.schoolName})
@@ -893,6 +904,61 @@ export default function Index() {
               </View>
             </ScrollView>
           </Modal>
+          {/* 프로필 상세 보기 모달 */}
+      <Modal visible={isDetailModalOpen} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 500, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+            <ScrollView>
+              <Text style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 4, color: '#333' }}>
+                👦 {detailProfile?.name} 학생 정보
+              </Text>
+              <Text style={{ fontSize: 14, color: '#666', marginBottom: 15 }}>
+                {detailProfile?.schoolName}
+              </Text>
+
+              <View style={{ height: 1, backgroundColor: '#eee', marginVertical: 10 }} />
+
+              {/* 1. 보유 알레르기 */}
+              <Text style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 6 }}>⚠️ 보유 알레르기</Text>
+              <Text style={{ fontSize: 14, color: '#444', marginBottom: 15 }}>
+                {detailProfile?.myAllergies && detailProfile.myAllergies.length > 0
+                  ? ALLERGY_LIST.filter(a => detailProfile.myAllergies.includes(a.id)).map(a => a.name).join(', ')
+                  : '선택된 알레르기 없음'}
+              </Text>
+
+              {/* 2. 주요 증상 */}
+              <Text style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 6 }}>🚨 주요 나타나는 증상</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 15 }}>
+                {detailProfile?.standardSymptoms && detailProfile.standardSymptoms.length > 0 ? (
+                  detailProfile.standardSymptoms.map(symptom => (
+                    <View key={symptom} style={{ backgroundColor: '#ffe3e3', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                      <Text style={{ color: '#d63031', fontSize: 12, fontWeight: 'bold' }}>{symptom}</Text>
+                    </View>
+                  ))
+                ) : (
+                  <Text style={{ fontSize: 14, color: '#888' }}>등록된 증상 없음</Text>
+                )}
+              </View>
+
+              {/* 3. 특이사항 메모 */}
+              <Text style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 6 }}>📝 학생별 특이 반응 / 메모</Text>
+              <View style={{ backgroundColor: '#f9f9f9', padding: 10, borderRadius: 8, marginBottom: 15 }}>
+                <Text style={{ fontSize: 14, color: '#333' }}>
+                  {detailProfile?.customSymptomNote || '입력된 특이사항이 없습니다.'}
+                </Text>
+              </View>
+            </ScrollView>
+
+            {/* 닫기 버튼 */}
+            <TouchableOpacity
+              onPress={() => setIsDetailModalOpen(false)}
+              style={{ backgroundColor: '#4a90e2', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
         </ScrollView>
         );
 }
