@@ -968,11 +968,15 @@ export default function Index() {
             </ScrollView>
 
             {/* 닫기 버튼 */}
+            {/* 닫기 버튼 */}
             <TouchableOpacity
-              onPress={() => setIsDetailModalOpen(false)}
-              style={{ backgroundColor: '#4a90e2', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>닫기</Text>
+               onPress={() => {
+                  setIsDetailModalOpen(false);       // 1. 상세 보기 모달 닫기
+                  setIsProfileListModalOpen(true);   // 2. 등록 학생 목록 모달 다시 열기
+                }}
+               style={{ backgroundColor: '#4a90e2', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
+>
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>닫기</Text>
             </TouchableOpacity>
           </View>
         </View>
