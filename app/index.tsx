@@ -150,8 +150,7 @@ export default function Index() {
       setSelectedMedicationPresets([...selectedMedicationPresets, med]);
     }
 }; 
-  const [medicationLocation, setMedicationLocation] = useState<string>('');   
-  const toggleSymptom = (symptom: string) => {
+   const toggleSymptom = (symptom: string) => {
     if (selectedSymptoms.includes(symptom)) {
       setSelectedSymptoms(selectedSymptoms.filter((s) => s !== symptom));
     } else {
