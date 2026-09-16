@@ -57,6 +57,13 @@ const ALLERGY_LIST: AllergyItem[] = [
   { id: 18, name: '조개류' },
   { id: 19, name: '잣' },
 ];
+// 대표 비상 약물 프리셋 목록
+const EMERGENCY_MED_PRESETS = [
+  '경구용 항히스타민제',
+  '벤토린 흡입기',
+  '에피네프린 자가투여주사기 (젝스트 등)',
+  '스테로이드 연고/제재',
+];
 
 interface Profile {
   id: string;
@@ -68,7 +75,9 @@ interface Profile {
   standardSymptoms?: string[]; 
   customSymptomNote?: string;
   emergencyMedication?: string;
-  medicationLocation?: string;    
+  medicationLocation?: string;
+  medicationPresets?: string[]; // 👈 추가: 체크 선택한 비상 약물 목록
+  customMedication?: string;    // 👈 추가: 직접 입력한 기타 비상 약물    
 }
 
 interface MealItem {
@@ -129,7 +138,19 @@ export default function Index() {
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptomNote, setCustomSymptomNote] = useState<string>('');
-  const [emergencyMedication, setEmergencyMedication] = useState<string>(''); 
+  const [customSymptomNote, setCustomSymptomNote] = useState<string>('');
+  const [selectedMedicationPresets, setSelectedMedicationPresets] = useState<string[]>([]);
+  const [customMedication, setCustomMedication] = useState<string>('');
+  const [medicationLocation, setMedicationLocation] = useState<string>('');
+
+// 약물 체크박스 칩 토글 함수
+  const toggleMedicationPreset = (med: string) => {
+    if (selectedMedicationPresets.includes(med)) {
+      setSelectedMedicationPresets(selectedMedicationPresets.filter((m) => m !== med));
+    } else {
+      setSelectedMedicationPresets([...selectedMedicationPresets, med]);
+    }
+}; 
   const [medicationLocation, setMedicationLocation] = useState<string>('');   
   const toggleSymptom = (symptom: string) => {
     if (selectedSymptoms.includes(symptom)) {
@@ -508,7 +529,8 @@ export default function Index() {
       myAllergies: selectedAllergies,
       standardSymptoms: selectedSymptoms,   
       customSymptomNote: customSymptomNote,
-      emergencyMedication: emergencyMedication, 
+      medicationPresets: selectedMedicationPresets,
+      customMedication: customMedication,
       medicationLocation: medicationLocation,    
     };
     const updated = [...profiles, newProfile];
@@ -523,8 +545,9 @@ export default function Index() {
     setSelectedAllergies([]);
     setSelectedSymptoms([]);
     setCustomSymptomNote('');
-    setEmergencyMedication(''); 
-    setMedicationLocation('');   
+    setSelectedMedicationPresets([]);
+    setCustomMedication('');
+    setMedicationLocation('');
   };
 
   return (
@@ -919,8 +942,35 @@ export default function Index() {
           value={customSymptomNote}
           onChangeText={setCustomSymptomNote}
         />
-{/* 6. 비상 약물 이름 입력 */}
+{/* 6. 긴급/비상 약물 (체크박스 칩 + 직접 입력) */}
       <Text style={[styles.label, { marginTop: 10 }]}>6. 긴급/비상 약물 (선택)</Text>
+      
+      {/* 자주 쓰는 비상 약물 Preset 칩 선택 영역 */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+        {EMERGENCY_MED_PRESETS.map((med) => {
+          const isSelected = selectedMedicationPresets.includes(med);
+          return (
+            <TouchableOpacity
+              key={med}
+              onPress={() => toggleMedicationPreset(med)}
+              style={{
+                backgroundColor: isSelected ? '#d9534f' : '#f8f9fa',
+                borderColor: isSelected ? '#d9534f' : '#ccc',
+                borderWidth: 1,
+                borderRadius: 20,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: isSelected ? '#fff' : '#333', fontWeight: isSelected ? 'bold' : 'normal' }}>
+                {isSelected ? '✓ ' : '+ '}{med}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* 기타 비상 약물 직접 입력 */}
       <TextInput
         style={{
           borderWidth: 1,
@@ -931,12 +981,12 @@ export default function Index() {
           backgroundColor: '#fff',
           marginBottom: 15,
         }}
-        placeholder="예: 에피네프린, 벤토린, 항히스타민제 등"
-        value={emergencyMedication}
-        onChangeText={setEmergencyMedication}
+        placeholder="기타 처방 약물 직접 입력 (예: 펜믹스, 특정 연고 등)"
+        value={customMedication}
+        onChangeText={setCustomMedication}
       />
 
-      {/* 7. 약물 보관 장소 입력 */}
+      {/* 7. 약물 보관 위치 입력 */}
       <Text style={[styles.label, { marginTop: 10 }]}>7. 약물 보관 위치 (선택)</Text>
       <TextInput
         style={{
@@ -1009,11 +1059,38 @@ export default function Index() {
       <Text style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 6, marginTop: 15 }}>
         💊 긴급/비상 약물 및 보관 위치
       </Text>
-      <View style={{ backgroundColor: '#fff3cd', padding: 10, borderRadius: 8, marginBottom: 15 }}>
-        <Text style={{ fontSize: 14, color: '#856404', fontWeight: 'bold' }}>
-          약물: {detailProfile?.emergencyMedication || '등록된 비상 약물 없음'}
+      <View style={{ backgroundColor: '#fff3cd', padding: 12, borderRadius: 8, marginBottom: 15 }}>
+        <Text style={{ fontSize: 14, color: '#856404', fontWeight: 'bold', marginBottom: 6 }}>
+          약물:
         </Text>
-        <Text style={{ fontSize: 13, color: '#856404', marginTop: 4 }}>
+        
+        {/* 선택한 약물 프리셋 목록 칩 표시 */}
+        {detailProfile?.medicationPresets && detailProfile.medicationPresets.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+            {detailProfile.medicationPresets.map((med) => (
+              <View key={med} style={{ backgroundColor: '#ffeeba', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, borderWidth: 1, borderColor: '#ffe8a1' }}>
+                <Text style={{ fontSize: 12, color: '#856404', fontWeight: 'bold' }}>• {med}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* 직접 입력한 기타 약물 표시 */}
+        {detailProfile?.customMedication ? (
+          <Text style={{ fontSize: 13, color: '#856404', marginBottom: 4 }}>
+            기타: {detailProfile.customMedication}
+          </Text>
+        ) : null}
+
+        {/* 선택된 약물도, 직접 입력도 없는 경우 */}
+        {!detailProfile?.medicationPresets?.length && !detailProfile?.customMedication && (
+          <Text style={{ fontSize: 13, color: '#856404', marginBottom: 4 }}>
+            등록된 비상 약물 없음
+          </Text>
+        )}
+
+        {/* 보관 위치 표시 */}
+        <Text style={{ fontSize: 13, color: '#856404', marginTop: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: '#ffe8a1' }}>
           위치: {detailProfile?.medicationLocation || '등록된 보관 위치 없음'}
         </Text>
       </View>
