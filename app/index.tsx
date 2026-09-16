@@ -154,6 +154,7 @@ const handleEditProfile = (profile: Profile) => {
   setIsModalOpen(true);
 };
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
   const [searchSchoolQuery, setSearchSchoolQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -766,19 +767,40 @@ const handleEditProfile = (profile: Profile) => {
               <ActivityIndicator size="large" color="#2ecc71" style={{ marginVertical: 30 }} />
             ) : meals.length > 0 ? (
               meals.map((item, index) => (
-                <View key={index} style={[styles.mealCard, item.isDanger ? styles.mealCardDanger : styles.mealCardSafe]}>
-                  <View style={styles.mealInfo}>
-                    <Text style={styles.dishName}>*{item.dishName}</Text>
-                    {item.isDanger && (
-                      <Text style={styles.dangerAllergyText}>
-                        ⚠️ 알레르기 유발 요소: {item.allergies.join(', ')}
-                      </Text>
-                    )}
-                  </View>
-                  <View style={[styles.badge, item.isDanger ? styles.badgeDanger : styles.badgeSafe]}>
-                    <Text style={styles.badgeText}>{item.isDanger ? '위험' : '안전'}</Text>
-                  </View>
-                </View>
+             <View 
+            key={index} 
+            style={{ 
+              backgroundColor: item.isDanger ? '#fff5f5' : '#f8f9fa', 
+              borderRadius: 8, 
+              paddingHorizontal: 12, 
+              paddingVertical: 8, 
+              marginBottom: 6, 
+              borderWidth: 1, 
+              borderColor: item.isDanger ? '#ffe3e3' : '#f1f3f5' 
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.isDanger ? '#222' : '#555' }}>
+                *{item.dishName}
+              </Text>
+              <View style={{ 
+                backgroundColor: item.isDanger ? '#ff6b6b' : '#2ed573', 
+                paddingHorizontal: 6, 
+                paddingVertical: 2, 
+                borderRadius: 4 
+              }}>
+                <Text style={{ fontSize: 10, color: '#fff', fontWeight: 'bold' }}>
+                  {item.isDanger ? '위험' : '안전'}
+                </Text>
+              </View>
+            </View>
+
+            {item.isDanger && (
+              <Text style={{ fontSize: 11, color: '#d63031', marginTop: 3 }}>
+                ⚠️ 알레르기 유발 요소: {item.allergies.join(', ')}
+              </Text>
+            )}
+          </View>
               ))
             ) : (
               <View style={styles.emptyBox}>
@@ -787,36 +809,29 @@ const handleEditProfile = (profile: Profile) => {
             )}
           </View>
 
-          {/* 4. 위험 메뉴 종합 안내 */}
-          <View style={[styles.card, styles.summaryCard]}>
-            <Text style={styles.summaryTitle}>🚨 위험 메뉴 종합 정리 안내</Text>
-            <Text style={styles.summarySubTitle}>선택일({selectedDate}) 기준, 위험 성분이 감지된 전체 학생 목록입니다.</Text>
-
-            {summaryLoading ? (
-              <ActivityIndicator size="small" color="#e74c3c" style={{ marginVertical: 10 }} />
-            ) : studentSummaries.length > 0 ? (
-              <View style={styles.summaryContainer}>
-                {studentSummaries.map((summary, idx) => (
-                  <View key={idx} style={styles.summaryRow}>
-                    <Text style={styles.summaryStudentName}>• {summary.studentName} :</Text>
-                    <View style={styles.summaryItemList}>
-                      {summary.dangerItems.map((item, itemIdx) => (
-                        <Text key={itemIdx} style={styles.summaryItemText}>
-                          {item.dishName}
-                          <Text style={styles.summaryAllergyText}>({item.allergies.join(', ')})</Text>
-                          {itemIdx < summary.dangerItems.length - 1 ? ', ' : ''}
-                        </Text>
-                      ))}
-                    </View>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <View style={styles.safeSummaryBox}>
-                <Text style={styles.safeSummaryText}>✅ 등록된 모든 학생의 급식에 알레르기 위험 요소가 없습니다.</Text>
-              </View>
-            )}
-          </View>
+          {/* 4. 위험 메뉴 종합 안내 버튼 */}
+      <TouchableOpacity
+        onPress={() => setIsSummaryModalOpen(true)}
+        style={{
+          backgroundColor: '#fff5f5',
+          borderColor: '#ff6b6b',
+          borderWidth: 1,
+          borderRadius: 12,
+          padding: 16,
+          marginVertical: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 18 }}>🚨</Text>
+          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#d63031' }}>
+            위험 메뉴 종합 정리 보기
+          </Text>
+        </View>
+        <Text style={{ fontSize: 14, color: '#ff6b6b', fontWeight: 'bold' }}>확인하기 ➔</Text>
+      </TouchableOpacity>
 
           {/* 모달 1: 알림 설정 */}
           <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
@@ -1228,6 +1243,70 @@ const handleEditProfile = (profile: Profile) => {
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      {/* 🚨 위험 메뉴 종합 정리 모달 */}
+      <Modal visible={isSummaryModalOpen} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 500, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+            
+            {/* 헤더 */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#d63031' }}>
+                🚨 위험 메뉴 종합 정리 안내
+              </Text>
+              <TouchableOpacity onPress={() => setIsSummaryModalOpen(false)}>
+                <Text style={{ fontSize: 18, color: '#999', fontWeight: 'bold' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#666', marginBottom: 15 }}>
+              선택일({selectedDate}) 기준, 위험 성분이 감지된 전체 학생 목록입니다.
+            </Text>
+
+            {/* 내용 스크롤 영역 */}
+            <ScrollView style={{ backgroundColor: '#fff5f5', borderRadius: 8, padding: 12, borderWidth: 1, borderColor: '#ffe3e3' }}>
+              {summaryLoading ? (
+                <ActivityIndicator size="small" color="#e74c3c" style={{ marginVertical: 10 }} />
+              ) : studentSummaries.length > 0 ? (
+                studentSummaries.map((summary, idx) => (
+                  <View key={idx} style={{ marginBottom: 10, flexDirection: 'row', flexWrap: 'wrap' }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#333' }}>
+                      • {summary.studentName} :{' '}
+                    </Text>
+                    {summary.dangerItems.map((item, itemIdx) => (
+                      <Text key={itemIdx} style={{ fontSize: 14, color: '#d63031', fontWeight: 'bold' }}>
+                        *{item.dishName}
+                        <Text style={{ fontSize: 12, color: '#e74c3c', fontWeight: 'normal' }}>
+                          ({item.allergies.join(', ')})
+                        </Text>
+                        {itemIdx < summary.dangerItems.length - 1 ? ', ' : ''}
+                      </Text>
+                    ))}
+                  </View>
+                ))
+              ) : (
+                <Text style={{ fontSize: 13, color: '#888', textAlign: 'center', paddingVertical: 10 }}>
+                  ✅ 등록된 모든 학생의 급식에 알레르기 위험 요소가 없습니다.
+                </Text>
+              )}
+            </ScrollView>
+
+            {/* 닫기 버튼 */}
+            <TouchableOpacity
+              onPress={() => setIsSummaryModalOpen(false)}
+              style={{
+                backgroundColor: '#4a90e2',
+                padding: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+                marginTop: 15,
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
+            </TouchableOpacity>
+
           </View>
         </View>
       </Modal>
