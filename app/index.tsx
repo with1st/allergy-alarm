@@ -130,6 +130,29 @@ export default function Index() {
   const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
 
   // 프로필 생성 모달 관련
+  // 프로필 수정 상태 추가 (null이면 신규 등록, string이면 해당 프로필 수정)
+const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+
+// 프로필 수정 모달 열기 함수
+const handleEditProfile = (profile: Profile) => {
+  setEditingProfileId(profile.id);
+  setNewStudentName(profile.name);
+  setSelectedSchool({
+    SCHUL_NM: profile.schoolName,
+    ATPT_OFCDC_SC_CODE: profile.ATPT_OFCDC_SC_CODE,
+    SD_SCHUL_CODE: profile.SD_SCHUL_CODE,
+  });
+  setSelectedAllergies(profile.myAllergies || []);
+  setSelectedSymptoms(profile.standardSymptoms || []);
+  setCustomSymptomNote(profile.customSymptomNote || '');
+  setSelectedMedicationPresets(profile.medicationPresets || []);
+  setCustomMedication(profile.customMedication || '');
+  setMedicationLocation(profile.medicationLocation || '');
+
+  // 상세 모달을 닫고 생성/수정 모달 열기
+  setIsDetailModalOpen(false);
+  setIsModalOpen(true);
+};
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newStudentName, setNewStudentName] = useState('');
   const [searchSchoolQuery, setSearchSchoolQuery] = useState('');
@@ -514,10 +537,35 @@ export default function Index() {
   };
 
   const handleSaveProfile = () => {
-    if (!newStudentName.trim() || !selectedSchool) {
-      Alert.alert('입력 오류', '학생 이름과 학교를 모두 지정해 주세요.');
-      return;
-    }
+  if (!newStudentName.trim() || !selectedSchool) {
+    Alert.alert('입력 오류', '학생 이름과 학교를 모두 지정해 주세요.');
+    return;
+  }
+
+  if (editingProfileId) {
+    // 1. 기존 프로필 수정 로직
+    const updatedProfiles = profiles.map((p) => {
+      if (p.id === editingProfileId) {
+        return {
+          ...p,
+          name: newStudentName.trim(),
+          schoolName: selectedSchool.SCHUL_NM,
+          ATPT_OFCDC_SC_CODE: selectedSchool.ATPT_OFCDC_SC_CODE,
+          SD_SCHUL_CODE: selectedSchool.SD_SCHUL_CODE,
+          myAllergies: selectedAllergies,
+          standardSymptoms: selectedSymptoms,
+          customSymptomNote: customSymptomNote,
+          medicationPresets: selectedMedicationPresets,
+          customMedication: customMedication,
+          medicationLocation: medicationLocation,
+        };
+      }
+      return p;
+    });
+
+    saveProfiles(updatedProfiles);
+  } else {
+    // 2. 신규 프로필 등록 로직
     const newProfile: Profile = {
       id: Date.now().toString(),
       name: newStudentName.trim(),
@@ -525,28 +573,32 @@ export default function Index() {
       ATPT_OFCDC_SC_CODE: selectedSchool.ATPT_OFCDC_SC_CODE,
       SD_SCHUL_CODE: selectedSchool.SD_SCHUL_CODE,
       myAllergies: selectedAllergies,
-      standardSymptoms: selectedSymptoms,   
+      standardSymptoms: selectedSymptoms,
       customSymptomNote: customSymptomNote,
       medicationPresets: selectedMedicationPresets,
       customMedication: customMedication,
-      medicationLocation: medicationLocation,    
+      medicationLocation: medicationLocation,
     };
+
     const updated = [...profiles, newProfile];
     saveProfiles(updated);
     setCurrentProfileId(newProfile.id);
+  }
 
-    setIsModalOpen(false);
-    setNewStudentName('');
-    setSelectedSchool(null);
-    setSearchSchoolQuery('');
-    setSearchResults([]);
-    setSelectedAllergies([]);
-    setSelectedSymptoms([]);
-    setCustomSymptomNote('');
-    setSelectedMedicationPresets([]);
-    setCustomMedication('');
-    setMedicationLocation('');
-  };
+  // 저장 완료 후 State 초기화 및 모달 닫기
+  setEditingProfileId(null);
+  setNewStudentName('');
+  setSelectedSchool(null);
+  setSearchSchoolQuery('');
+  setSearchResults([]);
+  setSelectedAllergies([]);
+  setSelectedSymptoms([]);
+  setCustomSymptomNote('');
+  setSelectedMedicationPresets([]);
+  setCustomMedication('');
+  setMedicationLocation('');
+  setIsModalOpen(false);
+};
 
   return (
     <ScrollView 
@@ -1093,18 +1145,39 @@ export default function Index() {
         </Text>
       </View>
             </ScrollView>
+{/* 상세 보기 모달 하단 버튼 영역 */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+        {/* 프로필 수정 버튼 */}
+        <TouchableOpacity
+          onPress={() => detailProfile && handleEditProfile(detailProfile)}
+          style={{
+            flex: 1,
+            backgroundColor: '#f0ad4e',
+            padding: 12,
+            borderRadius: 8,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>✏️ 프로필 수정</Text>
+        </TouchableOpacity>
 
-            {/* 닫기 버튼 */}
-            {/* 닫기 버튼 */}
-            <TouchableOpacity
-               onPress={() => {
-                  setIsDetailModalOpen(false);       // 1. 상세 보기 모달 닫기
-                  setIsProfileListModalOpen(true);   // 2. 등록 학생 목록 모달 다시 열기
-                }}
-               style={{ backgroundColor: '#4a90e2', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
->
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>닫기</Text>
-            </TouchableOpacity>
+        {/* 닫기 버튼 */}
+        <TouchableOpacity
+          onPress={() => {
+            setIsDetailModalOpen(false);
+            setIsProfileListModalOpen(true);
+          }}
+          style={{
+            flex: 1,
+            backgroundColor: '#4a90e2',
+            padding: 12,
+            borderRadius: 8,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
+        </TouchableOpacity>
+      </View>
           </View>
         </View>
       </Modal>
