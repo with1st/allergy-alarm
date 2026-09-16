@@ -138,7 +138,6 @@ export default function Index() {
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptomNote, setCustomSymptomNote] = useState<string>('');
-  const [customSymptomNote, setCustomSymptomNote] = useState<string>('');
   const [selectedMedicationPresets, setSelectedMedicationPresets] = useState<string[]>([]);
   const [customMedication, setCustomMedication] = useState<string>('');
   const [medicationLocation, setMedicationLocation] = useState<string>('');
