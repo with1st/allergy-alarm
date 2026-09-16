@@ -66,7 +66,9 @@ interface Profile {
   SD_SCHUL_CODE: string;
   myAllergies: number[];
   standardSymptoms?: string[]; 
-  customSymptomNote?: string; 
+  customSymptomNote?: string;
+  emergencyMedication?: string;
+  medicationLocation?: string;    
 }
 
 interface MealItem {
@@ -127,6 +129,8 @@ export default function Index() {
   const [selectedAllergies, setSelectedAllergies] = useState<number[]>([]);
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
   const [customSymptomNote, setCustomSymptomNote] = useState<string>('');
+  const [emergencyMedication, setEmergencyMedication] = useState<string>(''); 
+  const [medicationLocation, setMedicationLocation] = useState<string>('');   
   const toggleSymptom = (symptom: string) => {
     if (selectedSymptoms.includes(symptom)) {
       setSelectedSymptoms(selectedSymptoms.filter((s) => s !== symptom));
@@ -503,7 +507,9 @@ export default function Index() {
       SD_SCHUL_CODE: selectedSchool.SD_SCHUL_CODE,
       myAllergies: selectedAllergies,
       standardSymptoms: selectedSymptoms,   
-      customSymptomNote: customSymptomNote, 
+      customSymptomNote: customSymptomNote,
+      emergencyMedication: emergencyMedication, 
+      medicationLocation: medicationLocation,    
     };
     const updated = [...profiles, newProfile];
     saveProfiles(updated);
@@ -517,6 +523,8 @@ export default function Index() {
     setSelectedAllergies([]);
     setSelectedSymptoms([]);
     setCustomSymptomNote('');
+    setEmergencyMedication(''); 
+    setMedicationLocation('');   
   };
 
   return (
@@ -911,7 +919,39 @@ export default function Index() {
           value={customSymptomNote}
           onChangeText={setCustomSymptomNote}
         />
+{/* 6. 비상 약물 이름 입력 */}
+      <Text style={[styles.label, { marginTop: 10 }]}>6. 긴급/비상 약물 (선택)</Text>
+      <TextInput
+        style={{
+          borderWidth: 1,
+          borderColor: '#ccc',
+          borderRadius: 8,
+          padding: 10,
+          fontSize: 14,
+          backgroundColor: '#fff',
+          marginBottom: 15,
+        }}
+        placeholder="예: 에피네프린, 벤토린, 항히스타민제 등"
+        value={emergencyMedication}
+        onChangeText={setEmergencyMedication}
+      />
 
+      {/* 7. 약물 보관 장소 입력 */}
+      <Text style={[styles.label, { marginTop: 10 }]}>7. 약물 보관 위치 (선택)</Text>
+      <TextInput
+        style={{
+          borderWidth: 1,
+          borderColor: '#ccc',
+          borderRadius: 8,
+          padding: 10,
+          fontSize: 14,
+          backgroundColor: '#fff',
+          marginBottom: 15,
+        }}
+        placeholder="예: 보건실 2번 수납장, 책상 첫 번째 서랍, 가방 앞주머니"
+        value={medicationLocation}
+        onChangeText={setMedicationLocation}
+      />
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity style={[styles.modalBtn, styles.cancelBtn, { marginRight: 10 }]} onPress={() => setIsModalOpen(false)}>
                   <Text style={styles.modalBtnText}>취소</Text>
@@ -965,6 +1005,18 @@ export default function Index() {
                   {detailProfile?.customSymptomNote || '입력된 특이사항이 없습니다.'}
                 </Text>
               </View>
+              {/* 4. 비상 약물 및 보관 위치 */}
+      <Text style={{ fontSize: 15, fontWeight: 'bold', marginBottom: 6, marginTop: 15 }}>
+        💊 긴급/비상 약물 및 보관 위치
+      </Text>
+      <View style={{ backgroundColor: '#fff3cd', padding: 10, borderRadius: 8, marginBottom: 15 }}>
+        <Text style={{ fontSize: 14, color: '#856404', fontWeight: 'bold' }}>
+          약물: {detailProfile?.emergencyMedication || '등록된 비상 약물 없음'}
+        </Text>
+        <Text style={{ fontSize: 13, color: '#856404', marginTop: 4 }}>
+          위치: {detailProfile?.medicationLocation || '등록된 보관 위치 없음'}
+        </Text>
+      </View>
             </ScrollView>
 
             {/* 닫기 버튼 */}
