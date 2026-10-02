@@ -1180,55 +1180,72 @@ const handleEditProfile = (profile: Profile) => {
         </View>
       </View>
     </Modal>
-      {/* 1. 전체 학생 등록 목록 모달 */}
-      <Modal visible={isProfileListModalOpen} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 500, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#333' }}>
-              📋 등록 학생 목록
-            </Text>
-            
-            <ScrollView>
-              {profiles.length === 0 ? (
-                <Text style={{ textAlign: 'center', color: '#888', marginVertical: 20 }}>
-                  등록된 학생이 없습니다.
-                </Text>
-              ) : (
-                profiles.map((p) => (
-                  <TouchableOpacity
-                    key={p.id}
-                    onPress={() => {
-                      handleOpenDetail(p);
-                    }}
-                    style={{
-                      paddingVertical: 12,
-                      paddingHorizontal: 10,
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#eee',
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <View>
-                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>{p.name}</Text>
-                      <Text style={{ fontSize: 13, color: '#666', marginTop: 2 }}>{p.schoolName}</Text>
-                    </View>
-                    <Text style={{ fontSize: 14, color: '#4a90e2', fontWeight: 'bold' }}>상세보기 ➔</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
+      {/* 1. 프로필 수정 대상 선택 모달 */}
+    <Modal visible={isProfileListModalOpen} transparent animationType="slide">
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <View style={{ backgroundColor: '#fff', width: '100%', maxWidth: 500, borderRadius: 12, padding: 20, maxHeight: '80%' }}>
+          
+          {/* 타이틀 */}
+          <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 15, color: '#333' }}>
+            ✏️ 수정할 프로필 선택
+          </Text>
 
-            <TouchableOpacity
-              onPress={() => setIsProfileListModalOpen(false)}
-              style={{ backgroundColor: '#6c757d', padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
-            </TouchableOpacity>
-          </View>
+          <ScrollView>
+            {profiles.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#888', marginVertical: 20 }}>
+                등록된 학생이 없습니다.
+              </Text>
+            ) : (
+              profiles.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => {
+                    setIsProfileListModalOpen(false); // 목록 창 닫기
+                    handleEditProfile(p);             // 즉시 수정 화면 열기
+                  }}
+                  style={{
+                    paddingVertical: 12,
+                    paddingHorizontal: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#eee',
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <View>
+                    <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#333' }}>{p.name}</Text>
+                    <Text style={{ fontSize: 13, color: '#666', marginTop: 2 }}>{p.schoolName}</Text>
+                  </View>
+
+                  {/* 수정하기 뱃지 버튼 */}
+                  <View style={{ backgroundColor: '#f0ad4e', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 13, color: '#fff', fontWeight: 'bold' }}>
+                      ✏️ 수정하기
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+
+          {/* 닫기 버튼 */}
+          <TouchableOpacity
+            onPress={() => setIsProfileListModalOpen(false)}
+            style={{
+              backgroundColor: '#6c757d',
+              padding: 12,
+              borderRadius: 8,
+              alignItems: 'center',
+              marginTop: 15,
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
+          </TouchableOpacity>
+
         </View>
-      </Modal>
+      </View>
+    </Modal>
       {/* 🚨 위험 메뉴 종합 정리 모달 */}
       <Modal visible={isSummaryModalOpen} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
