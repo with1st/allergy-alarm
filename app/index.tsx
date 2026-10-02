@@ -166,6 +166,165 @@ const handleEditProfile = (profile: Profile) => {
   const [customMedication, setCustomMedication] = useState<string>('');
   const [medicationLocation, setMedicationLocation] = useState<string>('');
 
+  // 🍱 식판 메뉴 자동 분류 함수 (밥, 국, 반찬 6칸)
+function categorizeMealsToTray(mealItems: any[]) {
+  let rice: any = null;
+  let soup: any = null;
+  const sides: any[] = [];
+
+  mealItems.forEach((item) => {
+    const cleanName = (item.dishName || '').replace(/\*/g, '').trim();
+    // 밥 판별
+    if (!rice && /([밥죽]|덮밥|비빔밥|볶음밥|라이스|국수|스파게티|파스타|면)/.test(cleanName)) {
+      rice = item;
+    // 국/찌개 판별
+    } else if (!soup && /(국|찌개|탕|스프|수프|사발|개장|미역국|어묵국)/.test(cleanName)) {
+      soup = item;
+    // 그 외 반찬
+    } else {
+      sides.push(item);
+    }
+  });
+
+  // 키워드 미매칭 시 순차 보충
+  if (!rice && sides.length > 0) rice = sides.shift();
+  if (!soup && sides.length > 0) soup = sides.shift();
+
+  // 상단 반찬 6칸 고정 배열 생성
+  const topSides = Array.from({ length: 6 }, (_, i) => sides[i] || null);
+
+  return { rice, soup, topSides };
+}
+
+// 🍱 식판 뷰 전용 컴포넌트
+function MealTrayView({ meals }: { meals: any[] }) {
+  const { rice, soup, topSides } = categorizeMealsToTray(meals);
+
+  const renderTrayCell = (item: any, isCircle: boolean = false, minHeight: number = 75) => {
+    if (!item) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            minHeight,
+            backgroundColor: '#f1f3f5',
+            borderRadius: isCircle ? 999 : 12,
+            borderWidth: 1.5,
+            borderColor: '#dee2e6',
+            borderStyle: 'dashed',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontSize: 11, color: '#adb5bd' }}>빈 칸</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View
+        style={{
+          flex: 1,
+          minHeight,
+          backgroundColor: item.isDanger ? '#fff0f0' : '#ffffff',
+          borderRadius: isCircle ? 999 : 12,
+          borderWidth: 2,
+          borderColor: item.isDanger ? '#ff6b6b' : '#ced4da',
+          padding: 8,
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'relative',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+          elevation: 1,
+        }}
+      >
+        <View
+          style={{
+            position: 'absolute',
+            top: 5,
+            right: 6,
+            backgroundColor: item.isDanger ? '#ff4d4f' : '#52c41a',
+            paddingHorizontal: 5,
+            paddingVertical: 1,
+            borderRadius: 4,
+          }}
+        >
+          <Text style={{ color: '#fff', fontSize: 9, fontWeight: 'bold' }}>
+            {item.isDanger ? '위험' : '안전'}
+          </Text>
+        </View>
+
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: item.isDanger ? '#cf1322' : '#333',
+            textAlign: 'center',
+            marginTop: 2,
+          }}
+          numberOfLines={2}
+        >
+          {item.dishName?.replace(/\*/g, '')}
+        </Text>
+
+        {item.isDanger && item.allergies?.length > 0 && (
+          <Text
+            style={{
+              fontSize: 10,
+              color: '#ff4d4f',
+              textAlign: 'center',
+              marginTop: 4,
+              lineHeight: 12,
+            }}
+            numberOfLines={3}
+          >
+            ⚠️️ {item.allergies.join(', ')}
+          </Text>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View
+      style={{
+        backgroundColor: '#e9ecef',
+        borderRadius: 24,
+        padding: 12,
+        borderWidth: 3,
+        borderColor: '#ced4da',
+        gap: 10,
+        marginVertical: 6,
+      }}
+    >
+      <View style={{ gap: 6 }}>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {topSides.slice(0, 3).map((item, idx) => (
+            <View key={idx} style={{ flex: 1 }}>{renderTrayCell(item, false, 75)}</View>
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {topSides.slice(3, 6).map((item, idx) => (
+            <View key={idx + 3} style={{ flex: 1 }}>{renderTrayCell(item, false, 75)}</View>
+          ))}
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center', marginTop: 4 }}>
+        <View style={{ flex: 1.15 }}>
+          {renderTrayCell(rice, false, 110)}
+        </View>
+        <View style={{ flex: 1 }}>
+          {renderTrayCell(soup, true, 110)}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // 약물 체크박스 칩 토글 함수
   const toggleMedicationPreset = (med: string) => {
     if (selectedMedicationPresets.includes(med)) {
@@ -767,42 +926,7 @@ const handleEditProfile = (profile: Profile) => {
             {loading ? (
               <ActivityIndicator size="large" color="#2ecc71" style={{ marginVertical: 30 }} />
             ) : meals.length > 0 ? (
-              meals.map((item, index) => (
-             <View 
-            key={index} 
-            style={{ 
-              backgroundColor: item.isDanger ? '#fff5f5' : '#f8f9fa', 
-              borderRadius: 8, 
-              paddingHorizontal: 12, 
-              paddingVertical: 8, 
-              marginBottom: 6, 
-              borderWidth: 1, 
-              borderColor: item.isDanger ? '#ffe3e3' : '#f1f3f5' 
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 13, fontWeight: 'bold', color: item.isDanger ? '#222' : '#555' }}>
-                *{item.dishName}
-              </Text>
-              <View style={{ 
-                backgroundColor: item.isDanger ? '#ff6b6b' : '#2ed573', 
-                paddingHorizontal: 6, 
-                paddingVertical: 2, 
-                borderRadius: 4 
-              }}>
-                <Text style={{ fontSize: 10, color: '#fff', fontWeight: 'bold' }}>
-                  {item.isDanger ? '위험' : '안전'}
-                </Text>
-              </View>
-            </View>
-
-            {item.isDanger && (
-              <Text style={{ fontSize: 11, color: '#d63031', marginTop: 3 }}>
-                ⚠️ 알레르기 유발 요소: {item.allergies.join(', ')}
-              </Text>
-            )}
-          </View>
-              ))
+            <MealTrayView meals={meals} />
             ) : (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>해당 날짜에는 등록된 급식 정보가 없습니다.</Text>
