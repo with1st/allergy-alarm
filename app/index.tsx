@@ -1163,7 +1163,6 @@ const handleEditProfile = (profile: Profile) => {
       </View>
             </ScrollView>
 {/* 상세 보기 모달 하단 버튼 영역 */}
-     {/* 하단 닫기 버튼 (목록 재오픈 방지) */}
           <View style={{ marginTop: 15 }}>
             <TouchableOpacity
               onPress={() => setIsDetailModalOpen(false)}
@@ -1177,8 +1176,10 @@ const handleEditProfile = (profile: Profile) => {
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
             </TouchableOpacity>
           </View>
+
         </View>
-      </Modal>
+      </View>
+    </Modal>
       {/* 1. 전체 학생 등록 목록 모달 */}
       <Modal visible={isProfileListModalOpen} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
