@@ -613,70 +613,71 @@ const handleEditProfile = (profile: Profile) => {
       </View>
 
       {/* 1. 프로필 선택 영역 */}
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.sectionTitle}>👤 학생/자녀 프로필 선택</Text>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setIsModalOpen(true)}>
+    <View style={styles.card}>
+      <View style={styles.cardHeaderRow}>
+        <Text style={styles.sectionTitle}>👤 학생/자녀 프로필 선택</Text>
+        
+        {/* 우측 상단: 프로필 수정 & 추가 버튼 나란히 배치 */}
+        <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+          <TouchableOpacity 
+            style={[styles.addBtn, { backgroundColor: '#4a90e2' }]} 
+            onPress={() => setIsProfileListModalOpen(true)}
+          >
+            <Text style={styles.addBtnText}>✏️ 프로필 수정</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.addBtn} 
+            onPress={() => setIsModalOpen(true)}
+          >
             <Text style={styles.addBtnText}>+ 프로필 추가</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileList}>
-          {profiles.map((p) => {
-            const isSelected = p.id === currentProfileId;
-            return (
+      </View>
+
+      {/* 가로 스크롤 프로필 목록 */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileList}>
+        {profiles.map((p) => {
+          const isSelected = p.id === currentProfileId;
+          return (
+            <TouchableOpacity
+              key={p.id}
+              style={[
+                styles.profileChip,
+                isSelected && styles.profileChipSelected,
+                { flexDirection: 'row', alignItems: 'center', gap: 6 },
+              ]}
+              onPress={() => {
+                // 학생 선택과 동시에 상세 정보 팝업창을 단일 상태로 열어줍니다
+                setCurrentProfileId(p.id);
+                if (typeof handleOpenDetail === 'function') {
+                  handleOpenDetail(p);
+                }
+              }}
+            >
+              <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
+                {p.name} ({p.schoolName})
+              </Text>
+
+              {/* 🔴 삭제 버튼 (X) */}
               <TouchableOpacity
-                key={p.id}
-                style={[
-                  styles.profileChip,
-                  isSelected && styles.profileChipSelected,
-                  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-                ]}
-                onPress={() => setCurrentProfileId(p.id)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleDeleteProfile(p.id);
+                }}
+                style={{
+                  marginLeft: 4,
+                  paddingHorizontal: 4,
+                  borderRadius: 8,
+                  backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.3)' : '#ff4d4d',
+                }}
               >
-                <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
-                  {p.name} ({p.schoolName})
-                </Text>
-
-                {/* 🔴 삭제 버튼 (✕) */}
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleDeleteProfile(p.id);
-                  }}
-                  style={{
-                    marginLeft: 4,
-                    paddingHorizontal: 4,
-                    borderRadius: 8,
-                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.3)' : '#ff4d4d',
-                  }}
-                >
-                  <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✕</Text>
-                </TouchableOpacity>
+                <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✕</Text>
               </TouchableOpacity>
-            );
-          })}
-          
-        </ScrollView>
-
-        <TouchableOpacity
-          onPress={() => setIsProfileListModalOpen(true)}
-          style={{
-            backgroundColor: '#fff',
-            borderColor: '#4a90e2',
-            borderWidth: 1,
-            paddingVertical: 10,
-            paddingHorizontal: 15,
-            borderRadius: 8,
-            alignItems: 'center',
-            marginTop: 10,
-          }}
-        >
-          <Text style={{ color: '#4a90e2', fontWeight: 'bold', fontSize: 14 }}>
-            📋 등록된 학생의 알레르기/증상 목록 확인 및 수정
-          </Text>
-        </TouchableOpacity>
-         
-        </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
 
           {/* 2. 날짜 선택 영역 */}
           <View style={styles.card}>
