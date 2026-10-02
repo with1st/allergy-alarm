@@ -1163,38 +1163,19 @@ const handleEditProfile = (profile: Profile) => {
       </View>
             </ScrollView>
 {/* 상세 보기 모달 하단 버튼 영역 */}
-      <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-        {/* 프로필 수정 버튼 */}
-        <TouchableOpacity
-          onPress={() => detailProfile && handleEditProfile(detailProfile)}
-          style={{
-            flex: 1,
-            backgroundColor: '#f0ad4e',
-            padding: 12,
-            borderRadius: 8,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>✏️ 프로필 수정</Text>
-        </TouchableOpacity>
-
-        {/* 닫기 버튼 */}
-        <TouchableOpacity
-          onPress={() => {
-            setIsDetailModalOpen(false);
-            setIsProfileListModalOpen(true);
-          }}
-          style={{
-            flex: 1,
-            backgroundColor: '#4a90e2',
-            padding: 12,
-            borderRadius: 8,
-            alignItems: 'center',
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
-        </TouchableOpacity>
-      </View>
+     {/* 하단 닫기 버튼 (목록 재오픈 방지) */}
+          <View style={{ marginTop: 15 }}>
+            <TouchableOpacity
+              onPress={() => setIsDetailModalOpen(false)}
+              style={{
+                backgroundColor: '#4a90e2',
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
