@@ -156,6 +156,8 @@ const handleEditProfile = (profile: Profile) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [isProfileManageModalOpen, setIsProfileManageModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedDeleteIds, setSelectedDeleteIds] = useState<string[]>([]);
   const [isAllSummaryModalOpen, setIsAllSummaryModalOpen] = useState(false);
   
   const [newStudentName, setNewStudentName] = useState('');
@@ -1076,17 +1078,14 @@ function MealTrayView({ meals }: { meals: any[] }) {
                 alignItems: 'center',
                 marginBottom: 14,
               }}
-              onPress={() => {
-                const targetProf = profiles.find((p: any) => p.id === currentProfileId);
-                if (!targetProf) return;
-                if (confirm(`'${targetProf.name}' 학생 프로필을 정말 삭제하시겠습니까?`)) {
-                  setIsProfileManageModalOpen(false);
-                  handleDeleteProfile(targetProf.id);
-                }
+             onPress={() => {
+                setIsProfileManageModalOpen(false);
+                setSelectedDeleteIds([]);
+                setIsDeleteModalOpen(true);
               }}
             >
               <Text style={{ color: '#e03131', fontSize: 15, fontWeight: 'bold' }}>
-                🗑️ '{profiles.find((p: any) => p.id === currentProfileId)?.name || '학생'}' 프로필 삭제
+                🗑️ 기본 프로필 삭제하기
               </Text>
             </TouchableOpacity>
 
@@ -1101,6 +1100,114 @@ function MealTrayView({ meals }: { meals: any[] }) {
         </View>
       </Modal>
 
+{/* 🗑️ 삭제할 프로필 선택 모달 (다중 선택 및 일괄 삭제) */}
+      <Modal
+        visible={isDeleteModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsDeleteModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.settingsModalCard, { maxHeight: '80%', padding: 22 }]}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#c0392b', marginBottom: 6, textAlign: 'center' }}>
+              🗑️ 삭제할 프로필 선택
+            </Text>
+            <Text style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 16, textAlign: 'center' }}>
+              삭제할 학생을 한 명 또는 여러 명 선택해 주세요.
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 300, marginBottom: 16 }}>
+              {profiles.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: '#95a5a6', paddingVertical: 20 }}>
+                  등록된 프로필이 없습니다.
+                </Text>
+              ) : (
+                profiles.map((p: any) => {
+                  const isChecked = selectedDeleteIds.includes(p.id);
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 12,
+                        backgroundColor: isChecked ? '#ffe3e3' : '#f8f9fa',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: isChecked ? '#fa5252' : '#e9ecef',
+                        marginBottom: 8,
+                      }}
+                      onPress={() => {
+                        if (isChecked) {
+                          setSelectedDeleteIds(selectedDeleteIds.filter((id) => id !== p.id));
+                        } else {
+                          setSelectedDeleteIds([...selectedDeleteIds, p.id]);
+                        }
+                      }}
+                    >
+                      <View>
+                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#2c3e50' }}>
+                          {p.name}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#7f8c8d', marginTop: 2 }}>
+                          {p.schoolName || '학교 정보 없음'}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 18, fontWeight: 'bold', color: isChecked ? '#e03131' : '#adb5bd' }}>
+                        {isChecked ? '☑️' : '⬜'}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#868e96',
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+                onPress={() => setIsDeleteModalOpen(false)}
+              >
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>취소</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 2,
+                  backgroundColor: selectedDeleteIds.length > 0 ? '#e03131' : '#ffa8a8',
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                }}
+                disabled={selectedDeleteIds.length === 0}
+                onPress={() => {
+                  if (selectedDeleteIds.length === 0) return;
+                  if (confirm(`선택한 ${selectedDeleteIds.length}명의 프로필을 영구히 삭제하시겠습니까?`)) {
+                    selectedDeleteIds.forEach((id) => {
+                      if (typeof handleDeleteProfile === 'function') {
+                        handleDeleteProfile(id);
+                      }
+                    });
+                    setSelectedDeleteIds([]);
+                    setIsDeleteModalOpen(false);
+                  }
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>
+                  {selectedDeleteIds.length > 0 ? `${selectedDeleteIds.length}명 삭제하기` : '삭제할 대상 선택'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      
       {/* 📋 2. 등록 학생 전체 선택 날짜 알레르기 요약 모달 */}
       <Modal
         visible={isAllSummaryModalOpen}
