@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Modal,
   Platform,
   ScrollView,
@@ -13,7 +14,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  useWindowDimensions,
+  useWindowDimensions
 } from 'react-native';
 
 const CURRENT_APP_VERSION = '1.0.7';
@@ -65,6 +66,48 @@ const EMERGENCY_MED_PRESETS = [
   '스테로이드 연고/제재',
 ];
 
+export const AGE_GROUPS = [
+  { id: 'grade1_2', label: '초등 1~2학년', targetCal: 530 },
+  { id: 'grade3_4', label: '초등 3~4학년', targetCal: 620 },
+  { id: 'grade5_6', label: '초등 5~6학년', targetCal: 720 },
+  { id: 'middle',    label: '중학생',        targetCal: 830 },
+  { id: 'high',      label: '고등학생',      targetCal: 900 },
+  { id: 'adult',     label: '교직원 / 성인', targetCal: 750 },
+];
+
+// 🏫 1끼 기준 영양 권장량 (탄수화물(g), 단백질(g), 지방(g), 칼슘(mg))
+export const NUTRITION_STANDARDS: Record<string, { cal: number; carb: number; protein: number; fat: number; calcium: number }> = {
+  grade1_2: { cal: 530, carb: 80, protein: 20, fat: 15, calcium: 230 },
+  grade3_4: { cal: 620, carb: 93, protein: 25, fat: 18, calcium: 260 },
+  grade5_6: { cal: 720, carb: 108, protein: 30, fat: 21, calcium: 300 },
+  middle:    { cal: 830, carb: 125, protein: 38, fat: 24, calcium: 330 },
+  high:      { cal: 900, carb: 135, protein: 42, fat: 26, calcium: 350 },
+  adult:     { cal: 750, carb: 112, protein: 32, fat: 22, calcium: 270 },
+};
+
+// 나이스 NTR_INFO 문자열 파싱 함수
+export const parseNutritionInfo = (rawText?: string) => {
+  const result: Record<string, number> = { cal: 0, carb: 0, protein: 0, fat: 0, calcium: 0 };
+  if (!rawText) return result;
+
+  const lines = rawText.split(/<br\s*\/?>|\n/);
+  lines.forEach((line) => {
+    const text = line.trim();
+    const extractNum = (str: string) => {
+      const matched = str.match(/[\d.]+/);
+      return matched ? parseFloat(matched[0]) : 0;
+    };
+
+    if (text.includes('에너지') || text.includes('탄수화물(g)')) {
+      if (text.includes('탄수화물')) result.carb = extractNum(text.split(':')[1] || text);
+    }
+    if (text.includes('단백질(g)')) result.protein = extractNum(text.split(':')[1] || text);
+    if (text.includes('지방(g)')) result.fat = extractNum(text.split(':')[1] || text);
+    if (text.includes('칼슘(mg)')) result.calcium = extractNum(text.split(':')[1] || text);
+  });
+  return result;
+};
+
 interface Profile {
   id: string;
   name: string;
@@ -78,6 +121,7 @@ interface Profile {
   medicationLocation?: string;
   medicationPresets?: string[]; // 👈 추가: 체크 선택한 비상 약물 목록
   customMedication?: string;    // 👈 추가: 직접 입력한 기타 비상 약물    
+  ageGroup?: string;
 }
 
 interface MealItem {
@@ -124,6 +168,29 @@ export default function Index() {
   const webDateInputRef = useRef<HTMLInputElement>(null);
 
   const [meals, setMeals] = useState<MealItem[]>([]);
+  const [nutritionData, setNutritionData] = useState<{ ntr: string; cal: string }>({ ntr: '', cal: '' });
+  // 🔄 식판 플립 애니메이션
+  const [isTrayFlipped, setIsTrayFlipped] = useState(false);
+  const trayFlipAnim = useRef(new Animated.Value(0)).current;
+
+  const handleToggleTrayFlip = () => {
+    Animated.spring(trayFlipAnim, {
+      toValue: isTrayFlipped ? 0 : 180,
+      friction: 8,
+      tension: 10,
+      useNativeDriver: true,
+    }).start();
+    setIsTrayFlipped(!isTrayFlipped);
+  };
+
+  const trayFrontRotate = trayFlipAnim.interpolate({
+    inputRange: [0, 180],
+    outputRange: ['0deg', '180deg'],
+  });
+  const trayBackRotate = trayFlipAnim.interpolate({
+    inputRange: [0, 180],
+    outputRange: ['180deg', '360deg'],
+  });
   const [loading, setLoading] = useState<boolean>(false);
 
   const [studentSummaries, setStudentSummaries] = useState<StudentSummary[]>([]);
@@ -148,6 +215,7 @@ const handleEditProfile = (profile: Profile) => {
   setSelectedMedicationPresets(profile.medicationPresets || []);
   setCustomMedication(profile.customMedication || '');
   setMedicationLocation(profile.medicationLocation || '');
+  setSelectedAgeGroup(profile.ageGroup || 'grade3_4');
 
   // 상세 모달을 닫고 생성/수정 모달 열기
   setIsDetailModalOpen(false);
@@ -159,6 +227,7 @@ const handleEditProfile = (profile: Profile) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedDeleteIds, setSelectedDeleteIds] = useState<string[]>([]);
   const [isAllSummaryModalOpen, setIsAllSummaryModalOpen] = useState(false);
+  const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>('grade3_4');
   
   const [newStudentName, setNewStudentName] = useState('');
   const [searchSchoolQuery, setSearchSchoolQuery] = useState('');
@@ -641,12 +710,19 @@ function MealTrayView({ meals }: { meals: any[] }) {
       const res = await fetch(url);
       const json = await res.json();
 
-      if (json.mealServiceDietInfo?.[1]?.row?.[0]) {
-        const rawMeal = json.mealServiceDietInfo[1].row[0].DDISH_NM;
+     if (json.mealServiceDietInfo?.[1]?.row?.[0]) {
+        const row = json.mealServiceDietInfo[1].row[0];
+        const rawMeal = row.DDISH_NM;
         const parsed = parseMealInfo(rawMeal, currentProfile.myAllergies);
         setMeals(parsed);
+        // 📊 영양 정보 및 칼로리 저장
+        setNutritionData({
+          ntr: row.NTR_INFO || '',
+          cal: row.CAL_INFO || '',
+        });
       } else {
         setMeals([]);
+        setNutritionData({ ntr: '', cal: '' });
       }
     } catch (e) {
       console.error(e);
@@ -770,6 +846,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
           medicationPresets: selectedMedicationPresets,
           customMedication: customMedication,
           medicationLocation: medicationLocation,
+          ageGroup: selectedAgeGroup,
         };
       }
       return p;
@@ -790,6 +867,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
       medicationPresets: selectedMedicationPresets,
       customMedication: customMedication,
       medicationLocation: medicationLocation,
+      ageGroup: selectedAgeGroup,
     };
 
     const updated = [...profiles, newProfile];
@@ -960,7 +1038,109 @@ function MealTrayView({ meals }: { meals: any[] }) {
             {loading ? (
               <ActivityIndicator size="large" color="#2ecc71" style={{ marginVertical: 30 }} />
             ) : meals.length > 0 ? (
-            <MealTrayView meals={meals} />
+            <TouchableOpacity activeOpacity={0.95} onPress={handleToggleTrayFlip}>
+            <View style={{ position: 'relative' }}>
+              {/* 상단 터치 안내 라벨 */}
+              <View style={{ alignItems: 'center', marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: '#3498db', fontWeight: 'bold' }}>
+                  {isTrayFlipped ? '🔄 식판 메뉴로 돌아가기' : '✨ 식판을 터치하면 영양 리포트가 열려요'}
+                </Text>
+              </View>
+
+              {/* 앞면: 식판 */}
+              <Animated.View
+                style={{
+                  transform: [{ perspective: 1000 }, { rotateY: trayFrontRotate }],
+                  backfaceVisibility: 'hidden',
+                }}
+              >
+                <MealTrayView meals={meals} />
+              </Animated.View>
+
+              {/* 뒷면: 맞춤 영양 리포트 */}
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 26,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  transform: [{ perspective: 1000 }, { rotateY: trayBackRotate }],
+                  backfaceVisibility: 'hidden',
+                  backgroundColor: '#ffffff',
+                  borderRadius: 16,
+                  padding: 16,
+                  borderWidth: 1,
+                  borderColor: '#e9ecef',
+                  justifyContent: 'space-between',
+                }}
+              >
+                {(() => {
+                  const currentProf = (profiles || []).find((p: any) => p.id === currentProfileId);
+                  const userGroupKey = currentProf?.ageGroup || 'grade3_4';
+                  const standard = NUTRITION_STANDARDS[userGroupKey] || NUTRITION_STANDARDS.grade3_4;
+                  const groupLabel = AGE_GROUPS.find((g: any) => g.id === userGroupKey)?.label || '초등 3~4학년';
+
+                  const parsedNtr = parseNutritionInfo(nutritionData?.ntr);
+                  const currentCalNum = parseFloat((nutritionData?.cal || '0').replace(/[^\d.]/g, '')) || 0;
+
+                  const shortages: string[] = [];
+                  if (parsedNtr.protein > 0 && parsedNtr.protein < standard.protein * 0.8) shortages.push('단백질');
+                  if (parsedNtr.calcium > 0 && parsedNtr.calcium < standard.calcium * 0.8) shortages.push('칼슘');
+                  if (currentCalNum > 0 && currentCalNum < standard.cal * 0.85) shortages.push('열량');
+
+                  return (
+                    <View style={{ flex: 1, justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6 }}>
+                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#2c3e50' }}>
+                          📊 {currentProf?.name || '학생'} 맞춤 영양 분석
+                        </Text>
+                        <View style={{ backgroundColor: '#e7f5ff', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }}>
+                          <Text style={{ fontSize: 11, color: '#1971c2', fontWeight: 'bold' }}>{groupLabel}</Text>
+                        </View>
+                      </View>
+
+                      {/* 영양소 게이지 바 */}
+                      <View style={{ marginVertical: 6, gap: 7 }}>
+                        {[
+                          { name: '열량(에너지)', current: currentCalNum, target: standard.cal, unit: 'kcal', color: '#ff922b' },
+                          { name: '단백질', current: parsedNtr.protein, target: standard.protein, unit: 'g', color: '#51cf66' },
+                          { name: '칼슘', current: parsedNtr.calcium, target: standard.calcium, unit: 'mg', color: '#339af0' },
+                        ].map((item, idx) => {
+                          const percent = item.target > 0 && item.current > 0 ? Math.min(Math.round((item.current / item.target) * 100), 150) : 0;
+                          return (
+                            <View key={idx}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                                <Text style={{ fontSize: 11, color: '#495057', fontWeight: 'bold' }}>{item.name}</Text>
+                                <Text style={{ fontSize: 11, color: '#868e96' }}>
+                                  {item.current > 0 ? `${Math.round(item.current)}${item.unit} / ${item.target}${item.unit} (${percent}%)` : `기준 ${item.target}${item.unit}`}
+                                </Text>
+                              </View>
+                              <View style={{ height: 6, backgroundColor: '#f1f3f5', borderRadius: 3, overflow: 'hidden' }}>
+                                <View style={{ height: '100%', width: `${Math.min(percent, 100)}%`, backgroundColor: item.color, borderRadius: 3 }} />
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {/* 하단 피드백 문구 */}
+                      <View style={{ backgroundColor: '#fff9db', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#ffe066' }}>
+                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#f08c00', marginBottom: 2 }}>
+                          💡 영양 맞춤 보충 팁
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#495057', lineHeight: 15 }}>
+                          {shortages.length > 0
+                            ? `오늘 급식은 권장량 대비 [${shortages.join(', ')}]이 다소 적어요. 저녁이나 간식으로 챙겨주세요!`
+                            : '성장기 권장 영양소가 균형 있게 충족된 식단입니다!'}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })()}
+              </Animated.View>
+            </View>
+          </TouchableOpacity>
             ) : (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>해당 날짜에는 등록된 급식 정보가 없습니다.</Text>
@@ -1091,6 +1271,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
               }}
               onPress={() => {
                 setIsProfileManageModalOpen(false);
+                setSelectedAgeGroup('grade3_4');
                 setIsModalOpen(true);
               }}
             >
@@ -1483,7 +1664,41 @@ function MealTrayView({ meals }: { meals: any[] }) {
                 <Text style={styles.selectedSchoolBadge}>선택된 학교: {selectedSchool.SCHUL_NM}</Text>
               )}
 
-              <Text style={styles.label}>3. 보유 알레르기 선택 (다중 선택 가능)</Text>
+{/* 3. 학년 / 연령 구분 선택 */}
+            <Text style={[styles.label, { marginTop: 16 }]}>
+              3. 학년 / 연령 구분 (영양 권장량 기준)
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 8 }}>
+              {AGE_GROUPS.map((group) => {
+                const isSelected = selectedAgeGroup === group.id;
+                return (
+                  <TouchableOpacity
+                    key={group.id}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 18,
+                      backgroundColor: isSelected ? '#3498db' : '#f1f3f5',
+                      borderWidth: 1,
+                      borderColor: isSelected ? '#2980b9' : '#dee2e6',
+                    }}
+                    onPress={() => setSelectedAgeGroup(group.id)}
+                  >
+                    <Text
+                      style={{
+                        color: isSelected ? '#ffffff' : '#495057',
+                        fontWeight: isSelected ? 'bold' : 'normal',
+                        fontSize: 13,
+                      }}
+                    >
+                      {group.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+              <Text style={styles.label}>4. 보유 알레르기 선택 (다중 선택 가능)</Text>
               <View style={styles.allergyGrid}>
                 {ALLERGY_LIST.map((item) => {
                   const isChecked = selectedAllergies.includes(item.id);
@@ -1500,8 +1715,8 @@ function MealTrayView({ meals }: { meals: any[] }) {
                 })}
               </View>
 
-{/* 4. 알레르기 주요 증상 선택 */}
-        <Text style={[styles.label, { marginTop: 15 }]}>4. 주요 증상 선택 (다중 선택 가능)</Text>
+{/* 5. 알레르기 주요 증상 선택 */}
+        <Text style={[styles.label, { marginTop: 15 }]}>5. 주요 증상 선택 (다중 선택 가능)</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
           {STANDARD_SYMPTOMS.map((symptom) => {
             const isSelected = selectedSymptoms.includes(symptom);
@@ -1526,8 +1741,8 @@ function MealTrayView({ meals }: { meals: any[] }) {
           })}
         </View>
 
-        {/* 5. 학생별 특이 반응 / 메모 */}
-        <Text style={[styles.label, { marginTop: 10 }]}>5. 학생별 특이 반응 / 상세 메모</Text>
+        {/* 6. 학생별 특이 반응 / 메모 */}
+        <Text style={[styles.label, { marginTop: 10 }]}>6. 학생별 특이 반응 / 상세 메모</Text>
         <TextInput
           style={{
             borderWidth: 1,
@@ -1544,8 +1759,8 @@ function MealTrayView({ meals }: { meals: any[] }) {
           value={customSymptomNote}
           onChangeText={setCustomSymptomNote}
         />
-{/* 6. 긴급/비상 약물 (체크박스 칩 + 직접 입력) */}
-      <Text style={[styles.label, { marginTop: 10 }]}>6. 긴급/비상 약물 (선택)</Text>
+{/* 7. 긴급/비상 약물 (체크박스 칩 + 직접 입력) */}
+      <Text style={[styles.label, { marginTop: 10 }]}>7. 긴급/비상 약물 (선택)</Text>
       
       {/* 자주 쓰는 비상 약물 Preset 칩 선택 영역 */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
@@ -1588,8 +1803,8 @@ function MealTrayView({ meals }: { meals: any[] }) {
         onChangeText={setCustomMedication}
       />
 
-      {/* 7. 약물 보관 위치 입력 */}
-      <Text style={[styles.label, { marginTop: 10 }]}>7. 약물 보관 위치 (선택)</Text>
+      {/* 8. 약물 보관 위치 입력 */}
+      <Text style={[styles.label, { marginTop: 10 }]}>8. 약물 보관 위치 (선택)</Text>
       <TextInput
         style={{
           borderWidth: 1,
