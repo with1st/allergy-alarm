@@ -75,19 +75,19 @@ export const AGE_GROUPS = [
   { id: 'adult',     label: '교직원 / 성인', targetCal: 750 },
 ];
 
-// 🏫 1끼 기준 영양 권장량 (탄수화물(g), 단백질(g), 지방(g), 칼슘(mg))
-export const NUTRITION_STANDARDS: Record<string, { cal: number; carb: number; protein: number; fat: number; calcium: number }> = {
-  grade1_2: { cal: 530, carb: 80, protein: 20, fat: 15, calcium: 230 },
-  grade3_4: { cal: 620, carb: 93, protein: 25, fat: 18, calcium: 260 },
-  grade5_6: { cal: 720, carb: 108, protein: 30, fat: 21, calcium: 300 },
-  middle:    { cal: 830, carb: 125, protein: 38, fat: 24, calcium: 330 },
-  high:      { cal: 900, carb: 135, protein: 42, fat: 26, calcium: 350 },
-  adult:     { cal: 750, carb: 112, protein: 32, fat: 22, calcium: 270 },
+// 🏫 1끼 기준 연령별 권장 영양소 (열량, 탄수화물, 단백질, 지방, 칼슘, 철분, 비타민A, 비타민C)
+export const NUTRITION_STANDARDS: Record<string, { cal: number; carb: number; protein: number; fat: number; calcium: number; iron: number; vitA: number; vitC: number }> = {
+  grade1_2: { cal: 530, carb: 80, protein: 20, fat: 15, calcium: 230, iron: 3.5, vitA: 180, vitC: 25 },
+  grade3_4: { cal: 620, carb: 93, protein: 25, fat: 18, calcium: 260, iron: 4.0, vitA: 210, vitC: 30 },
+  grade5_6: { cal: 720, carb: 108, protein: 30, fat: 21, calcium: 300, iron: 4.5, vitA: 240, vitC: 35 },
+  middle:    { cal: 830, carb: 125, protein: 38, fat: 24, calcium: 330, iron: 5.0, vitA: 280, vitC: 40 },
+  high:      { cal: 900, carb: 135, protein: 42, fat: 26, calcium: 350, iron: 5.5, vitA: 300, vitC: 45 },
+  adult:     { cal: 750, carb: 112, protein: 32, fat: 22, calcium: 270, iron: 4.0, vitA: 250, vitC: 35 },
 };
 
-// 나이스 NTR_INFO 문자열 파싱 함수
+// 나이스 NTR_INFO 텍스트에서 8대 영양소 추출 함수
 export const parseNutritionInfo = (rawText?: string) => {
-  const result: Record<string, number> = { cal: 0, carb: 0, protein: 0, fat: 0, calcium: 0 };
+  const result = { cal: 0, carb: 0, protein: 0, fat: 0, calcium: 0, iron: 0, vitA: 0, vitC: 0 };
   if (!rawText) return result;
 
   const lines = rawText.split(/<br\s*\/?>|\n/);
@@ -98,12 +98,13 @@ export const parseNutritionInfo = (rawText?: string) => {
       return matched ? parseFloat(matched[0]) : 0;
     };
 
-    if (text.includes('에너지') || text.includes('탄수화물(g)')) {
-      if (text.includes('탄수화물')) result.carb = extractNum(text.split(':')[1] || text);
-    }
-    if (text.includes('단백질(g)')) result.protein = extractNum(text.split(':')[1] || text);
-    if (text.includes('지방(g)')) result.fat = extractNum(text.split(':')[1] || text);
-    if (text.includes('칼슘(mg)')) result.calcium = extractNum(text.split(':')[1] || text);
+    if (text.includes('탄수화물')) result.carb = extractNum(text.split(':')[1] || text);
+    if (text.includes('단백질')) result.protein = extractNum(text.split(':')[1] || text);
+    if (text.includes('지방')) result.fat = extractNum(text.split(':')[1] || text);
+    if (text.includes('칼슘')) result.calcium = extractNum(text.split(':')[1] || text);
+    if (text.includes('철분')) result.iron = extractNum(text.split(':')[1] || text);
+    if (text.includes('비타민A')) result.vitA = extractNum(text.split(':')[1] || text);
+    if (text.includes('비타민C')) result.vitC = extractNum(text.split(':')[1] || text);
   });
   return result;
 };
@@ -1040,10 +1041,10 @@ function MealTrayView({ meals }: { meals: any[] }) {
             ) : meals.length > 0 ? (
             <TouchableOpacity activeOpacity={0.95} onPress={handleToggleTrayFlip}>
             <View style={{ position: 'relative' }}>
-              {/* 상단 터치 안내 라벨 */}
+              {/* 상단 안내 라벨 */}
               <View style={{ alignItems: 'center', marginBottom: 8 }}>
                 <Text style={{ fontSize: 12, color: '#3498db', fontWeight: 'bold' }}>
-                  {isTrayFlipped ? '🔄 식판 메뉴로 돌아가기' : '✨ 식판을 터치하면 영양 리포트가 열려요'}
+                  {isTrayFlipped ? '🔄 식판 메뉴로 돌아가기' : '✨ 식판을 터치하면 상세 영양 리포트가 열려요'}
                 </Text>
               </View>
 
@@ -1057,7 +1058,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
                 <MealTrayView meals={meals} />
               </Animated.View>
 
-              {/* 뒷면: 맞춤 영양 리포트 */}
+              {/* 뒷면: 8대 맞춤 영양 리포트 */}
               <Animated.View
                 style={{
                   position: 'absolute',
@@ -1069,10 +1070,14 @@ function MealTrayView({ meals }: { meals: any[] }) {
                   backfaceVisibility: 'hidden',
                   backgroundColor: '#ffffff',
                   borderRadius: 16,
-                  padding: 16,
+                  padding: 14,
                   borderWidth: 1,
                   borderColor: '#e9ecef',
                   justifyContent: 'space-between',
+                  elevation: 4,
+                  shadowColor: '#000',
+                  shadowOpacity: 0.08,
+                  shadowRadius: 6,
                 }}
               >
                 {(() => {
@@ -1084,55 +1089,67 @@ function MealTrayView({ meals }: { meals: any[] }) {
                   const parsedNtr = parseNutritionInfo(nutritionData?.ntr);
                   const currentCalNum = parseFloat((nutritionData?.cal || '0').replace(/[^\d.]/g, '')) || 0;
 
+                  // 부족 영양소 진단
                   const shortages: string[] = [];
+                  if (currentCalNum > 0 && currentCalNum < standard.cal * 0.8) shortages.push('열량');
                   if (parsedNtr.protein > 0 && parsedNtr.protein < standard.protein * 0.8) shortages.push('단백질');
                   if (parsedNtr.calcium > 0 && parsedNtr.calcium < standard.calcium * 0.8) shortages.push('칼슘');
-                  if (currentCalNum > 0 && currentCalNum < standard.cal * 0.85) shortages.push('열량');
+                  if (parsedNtr.iron > 0 && parsedNtr.iron < standard.iron * 0.8) shortages.push('철분');
+                  if (parsedNtr.vitC > 0 && parsedNtr.vitC < standard.vitC * 0.8) shortages.push('비타민C');
+
+                  const nutrients = [
+                    { name: '열량', current: currentCalNum, target: standard.cal, unit: 'kcal', color: '#ff922b' },
+                    { name: '탄수화물', current: parsedNtr.carb, target: standard.carb, unit: 'g', color: '#fab005' },
+                    { name: '단백질', current: parsedNtr.protein, target: standard.protein, unit: 'g', color: '#51cf66' },
+                    { name: '지방', current: parsedNtr.fat, target: standard.fat, unit: 'g', color: '#ff6b6b' },
+                    { name: '칼슘(무기질)', current: parsedNtr.calcium, target: standard.calcium, unit: 'mg', color: '#339af0' },
+                    { name: '철분(무기질)', current: parsedNtr.iron, target: standard.iron, unit: 'mg', color: '#845ef7' },
+                    { name: '비타민A', current: parsedNtr.vitA, target: standard.vitA, unit: 'R.E', color: '#20c997' },
+                    { name: '비타민C', current: parsedNtr.vitC, target: standard.vitC, unit: 'mg', color: '#f783ac' },
+                  ];
 
                   return (
                     <View style={{ flex: 1, justifyContent: 'space-between' }}>
+                      {/* 헤더 */}
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6 }}>
-                        <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#2c3e50' }}>
-                          📊 {currentProf?.name || '학생'} 맞춤 영양 분석
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#2c3e50' }}>
+                          📊 {currentProf?.name || '학생'} 8대 영양소 분석
                         </Text>
-                        <View style={{ backgroundColor: '#e7f5ff', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 }}>
+                        <View style={{ backgroundColor: '#e7f5ff', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 }}>
                           <Text style={{ fontSize: 11, color: '#1971c2', fontWeight: 'bold' }}>{groupLabel}</Text>
                         </View>
                       </View>
 
-                      {/* 영양소 게이지 바 */}
-                      <View style={{ marginVertical: 6, gap: 7 }}>
-                        {[
-                          { name: '열량(에너지)', current: currentCalNum, target: standard.cal, unit: 'kcal', color: '#ff922b' },
-                          { name: '단백질', current: parsedNtr.protein, target: standard.protein, unit: 'g', color: '#51cf66' },
-                          { name: '칼슘', current: parsedNtr.calcium, target: standard.calcium, unit: 'mg', color: '#339af0' },
-                        ].map((item, idx) => {
+                      {/* 8대 영양소 2열(그리드) 배치 */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 6, marginVertical: 4 }}>
+                        {nutrients.map((item, idx) => {
                           const percent = item.target > 0 && item.current > 0 ? Math.min(Math.round((item.current / item.target) * 100), 150) : 0;
                           return (
-                            <View key={idx}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                                <Text style={{ fontSize: 11, color: '#495057', fontWeight: 'bold' }}>{item.name}</Text>
-                                <Text style={{ fontSize: 11, color: '#868e96' }}>
-                                  {item.current > 0 ? `${Math.round(item.current)}${item.unit} / ${item.target}${item.unit} (${percent}%)` : `기준 ${item.target}${item.unit}`}
-                                </Text>
+                            <View key={idx} style={{ width: '48%', backgroundColor: '#f8f9fa', padding: 6, borderRadius: 8, borderWidth: 1, borderColor: '#edf2f7' }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                                <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#495057' }}>{item.name}</Text>
+                                <Text style={{ fontSize: 9, fontWeight: 'bold', color: item.color }}>{percent}%</Text>
                               </View>
-                              <View style={{ height: 6, backgroundColor: '#f1f3f5', borderRadius: 3, overflow: 'hidden' }}>
-                                <View style={{ height: '100%', width: `${Math.min(percent, 100)}%`, backgroundColor: item.color, borderRadius: 3 }} />
+                              <View style={{ height: 4, backgroundColor: '#e9ecef', borderRadius: 2, overflow: 'hidden', marginBottom: 3 }}>
+                                <View style={{ height: '100%', width: `${Math.min(percent, 100)}%`, backgroundColor: item.color, borderRadius: 2 }} />
                               </View>
+                              <Text style={{ fontSize: 9, color: '#868e96', textAlign: 'right' }}>
+                                {item.current > 0 ? `${Math.round(item.current)}${item.unit}` : '-'} / {item.target}{item.unit}
+                              </Text>
                             </View>
                           );
                         })}
                       </View>
 
-                      {/* 하단 피드백 문구 */}
-                      <View style={{ backgroundColor: '#fff9db', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#ffe066' }}>
-                        <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#f08c00', marginBottom: 2 }}>
-                          💡 영양 맞춤 보충 팁
+                      {/* 맞춤 피드백 안내 카드 */}
+                      <View style={{ backgroundColor: '#fff9db', padding: 7, borderRadius: 8, borderWidth: 1, borderColor: '#ffe066' }}>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#f08c00', marginBottom: 1 }}>
+                          💡 권장 섭취 보충 팁
                         </Text>
-                        <Text style={{ fontSize: 11, color: '#495057', lineHeight: 15 }}>
+                        <Text style={{ fontSize: 10, color: '#495057', lineHeight: 14 }}>
                           {shortages.length > 0
-                            ? `오늘 급식은 권장량 대비 [${shortages.join(', ')}]이 다소 적어요. 저녁이나 간식으로 챙겨주세요!`
-                            : '성장기 권장 영양소가 균형 있게 충족된 식단입니다!'}
+                            ? `오늘 급식은 권장량 대비 [${shortages.join(', ')}]이 조금 적어요. 저녁이나 간식(우유, 과일 등)으로 보충해 주세요!`
+                            : '8대 성장기 필수 영양소가 고르게 충족된 균형 식단입니다!'}
                         </Text>
                       </View>
                     </View>
