@@ -1186,14 +1186,34 @@ function MealTrayView({ meals }: { meals: any[] }) {
                   alignItems: 'center',
                 }}
                 disabled={selectedDeleteIds.length === 0}
-                onPress={() => {
+                onPress={async () => {
                   if (selectedDeleteIds.length === 0) return;
-                  if (confirm(`선택한 ${selectedDeleteIds.length}명의 프로필을 영구히 삭제하시겠습니까?`)) {
-                    selectedDeleteIds.forEach((id) => {
-                      if (typeof handleDeleteProfile === 'function') {
-                        handleDeleteProfile(id);
+                  if (confirm(`선택한 ${selectedDeleteIds.length}명의 프로필을 삭제하시겠습니까?`)) {
+                    // 1. 선택된 학생들을 한 번에 제외
+                    const updated = profiles.filter((p: any) => !selectedDeleteIds.includes(p.id));
+                    setProfiles(updated);
+
+                    // 2. 스토리지(AsyncStorage / localStorage)에 한 번에 영구 저장
+                    try {
+                      if (typeof AsyncStorage !== 'undefined') {
+                        await AsyncStorage.setItem('student_profiles', JSON.stringify(updated));
+                      } else if (typeof localStorage !== 'undefined') {
+                        localStorage.setItem('student_profiles', JSON.stringify(updated));
                       }
-                    });
+                    } catch (e) {
+                      console.error(e);
+                    }
+
+                    // 3. 만약 현재 선택되어 보던 학생이 삭제 목록에 포함되어 있다면 남은 첫 번째 학생으로 변경
+                    if (selectedDeleteIds.includes(currentProfileId)) {
+                      if (updated.length > 0) {
+                        setCurrentProfileId(updated[0].id);
+                      } else {
+                        setCurrentProfileId('');
+                      }
+                    }
+
+                    // 4. 모달 닫기 및 선택 초기화
                     setSelectedDeleteIds([]);
                     setIsDeleteModalOpen(false);
                   }
@@ -1207,7 +1227,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
           </View>
         </View>
       </Modal>
-      
+
       {/* 📋 2. 등록 학생 전체 선택 날짜 알레르기 요약 모달 */}
       <Modal
         visible={isAllSummaryModalOpen}
