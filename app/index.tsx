@@ -155,6 +155,9 @@ const handleEditProfile = (profile: Profile) => {
 };
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
+  const [isProfileManageModalOpen, setIsProfileManageModalOpen] = useState(false);
+  const [isAllSummaryModalOpen, setIsAllSummaryModalOpen] = useState(false);
+  
   const [newStudentName, setNewStudentName] = useState('');
   const [searchSchoolQuery, setSearchSchoolQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -648,7 +651,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
         if ('showPicker' in webDateInputRef.current) {
           webDateInputRef.current.showPicker();
         } else {
-          webDateInputRef.current.click();
+          (webDateInputRef.current as any)?.click();
         }
       }
     } else {
@@ -776,19 +779,19 @@ function MealTrayView({ meals }: { meals: any[] }) {
       <View style={styles.cardHeaderRow}>
         <Text style={styles.sectionTitle}>👤 학생/자녀 프로필 선택</Text>
         
-        {/* 우측 상단: 프로필 수정 & 추가 버튼 나란히 배치 */}
+       {/* 우측 상단: 프로필 관리 & 요약정리 버튼 */}
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-          <TouchableOpacity 
-            style={[styles.addBtn, { backgroundColor: '#4a90e2' }]} 
-            onPress={() => setIsProfileListModalOpen(true)}
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: '#4a90e2' }]}
+            onPress={() => setIsProfileManageModalOpen(true)}
           >
-            <Text style={styles.addBtnText}>✏️ 프로필 수정</Text>
+            <Text style={styles.addBtnText}>⚙️ 프로필 관리</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.addBtn} 
-            onPress={() => setIsModalOpen(true)}
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: '#e74c3c' }]}
+            onPress={() => setIsAllSummaryModalOpen(true)}
           >
-            <Text style={styles.addBtnText}>+ 프로필 추가</Text>
+            <Text style={styles.addBtnText}>📋 요약정리</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -805,12 +808,9 @@ function MealTrayView({ meals }: { meals: any[] }) {
                 isSelected && styles.profileChipSelected,
                 { flexDirection: 'row', alignItems: 'center', gap: 6 },
               ]}
+              // 수정 후
               onPress={() => {
-                // 학생 선택과 동시에 상세 정보 팝업창을 단일 상태로 열어줍니다
-                setCurrentProfileId(p.id);
-                if (typeof handleOpenDetail === 'function') {
-                  handleOpenDetail(p);
-                }
+               setCurrentProfileId(p.id);
               }}
             >
               <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
@@ -932,33 +932,249 @@ function MealTrayView({ meals }: { meals: any[] }) {
                 <Text style={styles.emptyText}>해당 날짜에는 등록된 급식 정보가 없습니다.</Text>
               </View>
             )}
+            {/* 📄 선택된 학생 상세 정보 카드 (식판 바로 아래 상시 노출) */}
+        {(() => {
+          const targetProf: any = (profiles || []).find((p: any) => p.id === currentProfileId);
+          if (!targetProf) return null;
+
+          const allergyArr = targetProf.myAllergies || targetProf.allergies || [];
+          const allergiesList = Array.isArray(allergyArr) && allergyArr.length > 0 
+            ? allergyArr.join(', ') 
+            : '등록된 알레르기 없음';
+
+          const symptomsArr = targetProf.symptoms || [];
+          const symptomsList = Array.isArray(symptomsArr) && symptomsArr.length > 0 
+            ? symptomsArr.join(', ') 
+            : (targetProf.symptomText || '등록된 증상 없음');
+
+          const medsArr = targetProf.medications || [];
+          const medsList = Array.isArray(medsArr) && medsArr.length > 0 
+            ? medsArr.join(', ') 
+            : (targetProf.medicationText || '등록된 비상 약물 없음');
+
+          return (
+            <View
+              style={{
+                marginTop: 14,
+                padding: 16,
+                backgroundColor: '#ffffff',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: '#e9ecef',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#2c3e50', marginBottom: 12 }}>
+                🧑 {targetProf.name} 학생 정보 ({targetProf.schoolName || '학교'})
+              </Text>
+
+              <View style={{ gap: 10 }}>
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#e67e22' }}>⚠️ 보유 알레르기</Text>
+                  <Text style={{ fontSize: 13, color: '#333', marginTop: 3 }}>
+                    {allergiesList}
+                  </Text>
+                </View>
+
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#e74c3c' }}>🚨 주요 나타나는 증상</Text>
+                  <Text style={{ fontSize: 13, color: '#333', marginTop: 3 }}>
+                    {symptomsList}
+                  </Text>
+                </View>
+
+                {targetProf.memo ? (
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#34495e' }}>📝 학생별 특이 반응 / 메모</Text>
+                    <View style={{ backgroundColor: '#f8f9fa', padding: 10, borderRadius: 8, marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: '#495057' }}>{targetProf.memo}</Text>
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={{ backgroundColor: '#fff9db', padding: 12, borderRadius: 10, marginTop: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#d9480f' }}>💊 긴급/비상 약물 및 보관 위치</Text>
+                  <Text style={{ fontSize: 12, color: '#333', marginTop: 4 }}>
+                    • 약물: {medsList}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#333', marginTop: 2 }}>
+                    • 위치: {targetProf.medLocation || '등록된 보관 위치 없음'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          );
+        })()}
           </View>
 
-          {/* 4. 위험 메뉴 종합 안내 버튼 */}
-      <TouchableOpacity
-        onPress={() => setIsSummaryModalOpen(true)}
-        style={{
-          backgroundColor: '#fff5f5',
-          borderColor: '#ff6b6b',
-          borderWidth: 1,
-          borderRadius: 12,
-          padding: 16,
-          marginVertical: 10,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
+{/* ⚙️ 1. 프로필 관리 선택 모달 (수정 / 추가 분기) */}
+      <Modal
+        visible={isProfileManageModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsProfileManageModalOpen(false)}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 18 }}>🚨</Text>
-          <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#d63031' }}>
-            위험 메뉴 종합 정리 보기
-          </Text>
-        </View>
-        <Text style={{ fontSize: 14, color: '#ff6b6b', fontWeight: 'bold' }}>확인하기 ➔</Text>
-      </TouchableOpacity>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.settingsModalCard, { padding: 22 }]}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 8, textAlign: 'center' }}>
+              ⚙️ 프로필 관리
+            </Text>
+            <Text style={{ fontSize: 13, color: '#7f8c8d', marginBottom: 20, textAlign: 'center' }}>
+              수행하실 작업을 선택해 주세요.
+            </Text>
 
-          {/* 모달 1: 알림 설정 */}
+            {/* 기존 프로필 수정 선택창 열기 */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#4a90e2',
+                paddingVertical: 14,
+                borderRadius: 10,
+                alignItems: 'center',
+                marginBottom: 10,
+              }}
+              onPress={() => {
+                setIsProfileManageModalOpen(false);
+                setIsProfileListModalOpen(true);
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
+                ✏️ 기존 프로필 수정하기
+              </Text>
+            </TouchableOpacity>
+
+            {/* 새 프로필 추가창 열기 */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#2ecc71',
+                paddingVertical: 14,
+                borderRadius: 10,
+                alignItems: 'center',
+                marginBottom: 14,
+              }}
+              onPress={() => {
+                setIsProfileManageModalOpen(false);
+                setIsModalOpen(true);
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
+                + 새 프로필 추가하기
+              </Text>
+            </TouchableOpacity>
+
+            {/* 닫기 버튼 */}
+            <TouchableOpacity
+              style={{ paddingVertical: 10, alignItems: 'center' }}
+              onPress={() => setIsProfileManageModalOpen(false)}
+            >
+              <Text style={{ color: '#95a5a6', fontSize: 14 }}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 📋 2. 등록 학생 전체 당일 알레르기 요약 모달 */}
+      <Modal
+        visible={isAllSummaryModalOpen}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsAllSummaryModalOpen(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.settingsModalCard, { maxHeight: '80%', padding: 20 }]}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 }}>
+              📋 오늘 학생 위험 급식 요약
+            </Text>
+            <Text style={{ fontSize: 12, color: '#7f8c8d', marginBottom: 14 }}>
+              등록된 모든 학생의 당일 급식 위험 메뉴를 한눈에 확인합니다.
+            </Text>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+              {(() => {
+                const dangerReports = (profiles || [])
+                  .map((prof: any) => {
+                    const dangerDishes = ((meals as any) || []).filter((dish: any) => {
+                      const dishAllergies = dish?.allergies || [];
+                      const userAllergies = prof?.myAllergies || prof?.allergies || [];
+                      return (
+                        Array.isArray(dishAllergies) &&
+                        dishAllergies.some((a: any) =>
+                          Array.isArray(userAllergies) &&
+                          userAllergies.some(
+                            (u: any) =>
+                              String(u) === String(a) ||
+                              (typeof a === 'string' && a.includes(String(u)))
+                          )
+                        )
+                      );
+                    });
+                    return { profile: prof, dangerDishes };
+                  })
+                  .filter((r: any) => r.dangerDishes.length > 0);
+
+                if (dangerReports.length === 0) {
+                  return (
+                    <View style={{ paddingVertical: 36, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 16, color: '#2ecc71', fontWeight: 'bold' }}>
+                        ✅ 오늘은 모든 학생이 안전합니다!
+                      </Text>
+                      <Text style={{ fontSize: 13, color: '#95a5a6', marginTop: 6, textAlign: 'center' }}>
+                        오늘 급식 식단에 등록된 학생들의{'\n'}알레르기 유발 식품이 없습니다.
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return dangerReports.map((report: any, idx: number) => (
+                  <View
+                    key={idx}
+                    style={{
+                      backgroundColor: '#fff5f5',
+                      borderLeftWidth: 4,
+                      borderLeftColor: '#e74c3c',
+                      padding: 12,
+                      borderRadius: 8,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: 'bold', color: '#c0392b' }}>
+                      👤 {report.profile.name} ({report.profile.schoolName || '학교'})
+                    </Text>
+                    <View style={{ marginTop: 6, gap: 4 }}>
+                      {report.dangerDishes.map((dish: any, dIdx: number) => (
+                        <Text key={dIdx} style={{ fontSize: 13, color: '#333' }}>
+                          • <Text style={{ fontWeight: 'bold' }}>{dish.dishName?.replace(/\*/g, '')}</Text>
+                          <Text style={{ color: '#e74c3c', fontSize: 12 }}>
+                            {' '}(유발: {Array.isArray(dish.allergies) ? dish.allergies.join(', ') : ''})
+                          </Text>
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                ));
+              })()}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#3498db',
+                paddingVertical: 12,
+                borderRadius: 8,
+                alignItems: 'center',
+                marginTop: 14,
+              }}
+              onPress={() => setIsAllSummaryModalOpen(false)}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>닫기</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+            {/* 모달 1: 알림 설정 */}
           <Modal visible={isSettingsModalVisible} animationType="fade" transparent={true}>
             <View style={styles.modalBackdrop}>
               <View style={styles.settingsModalCard}>
