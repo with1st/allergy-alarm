@@ -816,42 +816,25 @@ function MealTrayView({ meals }: { meals: any[] }) {
       {/* 가로 스크롤 프로필 목록 */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.profileList}>
         {profiles.map((p) => {
-          const isSelected = p.id === currentProfileId;
-          return (
-            <TouchableOpacity
-              key={p.id}
-              style={[
-                styles.profileChip,
-                isSelected && styles.profileChipSelected,
-                { flexDirection: 'row', alignItems: 'center', gap: 6 },
-              ]}
-              // 수정 후
-              onPress={() => {
-               setCurrentProfileId(p.id);
-              }}
-            >
-              <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
-                {p.name} ({p.schoolName})
-              </Text>
-
-              {/* 🔴 삭제 버튼 (X) */}
+            const isSelected = p.id === currentProfileId;
+            return (
               <TouchableOpacity
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleDeleteProfile(p.id);
-                }}
-                style={{
-                  marginLeft: 4,
-                  paddingHorizontal: 4,
-                  borderRadius: 8,
-                  backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.3)' : '#ff4d4d',
+                key={p.id}
+                style={[
+                  styles.profileChip,
+                  isSelected && styles.profileChipSelected,
+                  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14 },
+                ]}
+                onPress={() => {
+                  setCurrentProfileId(p.id);
                 }}
               >
-                <Text style={{ color: 'white', fontSize: 12, fontWeight: 'bold' }}>✕</Text>
+                <Text style={[styles.profileChipText, isSelected && styles.profileChipTextSelected]}>
+                  {p.name} ({p.schoolName})
+                </Text>
               </TouchableOpacity>
-            </TouchableOpacity>
-          );
-        })}
+            );
+          })}
       </ScrollView>
     </View>
 
@@ -1028,7 +1011,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
         })()}
           </View>
 
-{/* ⚙️ 1. 프로필 관리 선택 모달 (수정 / 추가 분기) */}
+{/* ⚙️ 1. 프로필 관리 선택 모달 (수정 / 추가 / 삭제 분기) */}
       <Modal
         visible={isProfileManageModalOpen}
         transparent={true}
@@ -1044,7 +1027,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
               수행하실 작업을 선택해 주세요.
             </Text>
 
-            {/* 기존 프로필 수정 선택창 열기 */}
+            {/* 기존 프로필 수정 버튼 */}
             <TouchableOpacity
               style={{
                 backgroundColor: '#4a90e2',
@@ -1063,14 +1046,14 @@ function MealTrayView({ meals }: { meals: any[] }) {
               </Text>
             </TouchableOpacity>
 
-            {/* 새 프로필 추가창 열기 */}
+            {/* 새 프로필 추가 버튼 */}
             <TouchableOpacity
               style={{
                 backgroundColor: '#2ecc71',
                 paddingVertical: 14,
                 borderRadius: 10,
                 alignItems: 'center',
-                marginBottom: 14,
+                marginBottom: 10,
               }}
               onPress={() => {
                 setIsProfileManageModalOpen(false);
@@ -1078,7 +1061,32 @@ function MealTrayView({ meals }: { meals: any[] }) {
               }}
             >
               <Text style={{ color: '#fff', fontSize: 15, fontWeight: 'bold' }}>
-                + 새 프로필 추가하기
+                ➕ 새 프로필 추가하기
+              </Text>
+            </TouchableOpacity>
+
+            {/* 현재 선택된 학생 삭제 버튼 */}
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#fff0f0',
+                borderWidth: 1,
+                borderColor: '#ffc9c9',
+                paddingVertical: 14,
+                borderRadius: 10,
+                alignItems: 'center',
+                marginBottom: 14,
+              }}
+              onPress={() => {
+                const targetProf = profiles.find((p: any) => p.id === currentProfileId);
+                if (!targetProf) return;
+                if (confirm(`'${targetProf.name}' 학생 프로필을 정말 삭제하시겠습니까?`)) {
+                  setIsProfileManageModalOpen(false);
+                  handleDeleteProfile(targetProf.id);
+                }
+              }}
+            >
+              <Text style={{ color: '#e03131', fontSize: 15, fontWeight: 'bold' }}>
+                🗑️ '{profiles.find((p: any) => p.id === currentProfileId)?.name || '학생'}' 프로필 삭제
               </Text>
             </TouchableOpacity>
 
