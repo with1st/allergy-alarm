@@ -1435,7 +1435,11 @@ function MealTrayView({ meals }: { meals: any[] }) {
                         styles.searchItem,
                         selectedSchool?.SD_SCHUL_CODE === item.SD_SCHUL_CODE && styles.searchItemSelected,
                       ]}
-                      onPress={() => setSelectedSchool(item)}>
+                      onPress={() => {
+  setSelectedSchool(item);
+  setSearchResults([]);
+  setSearchSchoolQuery(item.SCHUL_NM || '');
+}}>
                       <Text style={styles.schoolNameText}>{item.SCHUL_NM}</Text>
                       <Text style={styles.schoolAddrText}>{item.ORG_RDNMA || item.LCTN_SC_NM}</Text>
                     </TouchableOpacity>
