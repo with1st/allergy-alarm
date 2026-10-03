@@ -1093,7 +1093,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
         </View>
       </Modal>
 
-      {/* 📋 2. 등록 학생 전체 당일 알레르기 요약 모달 */}
+      {/* 📋 2. 등록 학생 전체 선택 날짜 알레르기 요약 모달 */}
       <Modal
         visible={isAllSummaryModalOpen}
         transparent={true}
@@ -1103,10 +1103,10 @@ function MealTrayView({ meals }: { meals: any[] }) {
         <View style={styles.modalBackdrop}>
           <View style={[styles.settingsModalCard, { maxHeight: '80%', padding: 20 }]}>
             <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#2c3e50', marginBottom: 4 }}>
-              📋 오늘 학생 위험 급식 요약
+              📋 {selectedDate || '선택 날짜'} 학생 위험 급식 요약
             </Text>
             <Text style={{ fontSize: 12, color: '#7f8c8d', marginBottom: 14 }}>
-              등록된 모든 학생의 당일 급식 위험 메뉴를 한눈에 확인합니다.
+              선택하신 날짜({selectedDate || '해당일'}) 급식을 기준으로 등록된 학생들의 위험 메뉴를 확인합니다.
             </Text>
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
@@ -1136,10 +1136,10 @@ function MealTrayView({ meals }: { meals: any[] }) {
                   return (
                     <View style={{ paddingVertical: 36, alignItems: 'center' }}>
                       <Text style={{ fontSize: 16, color: '#2ecc71', fontWeight: 'bold' }}>
-                        ✅ 오늘은 모든 학생이 안전합니다!
+                        ✅ 선택한 날짜에는 모든 학생이 안전합니다!
                       </Text>
                       <Text style={{ fontSize: 13, color: '#95a5a6', marginTop: 6, textAlign: 'center' }}>
-                        오늘 급식 식단에 등록된 학생들의{'\n'}알레르기 유발 식품이 없습니다.
+                        {selectedDate || '해당 날짜'} 급식 식단에 등록된 학생들의{'\n'}알레르기 유발 식품이 없습니다.
                       </Text>
                     </View>
                   );
