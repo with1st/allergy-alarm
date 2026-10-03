@@ -404,6 +404,38 @@ function MealTrayView({ meals }: { meals: any[] }) {
   const [inputMinute, setInputMinute] = useState('40');
 
   useEffect(() => {
+    // 📱 iOS Safari 자동 줌인 및 핀치 줌 방지 스크립트
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      // 1. Viewport 메타 태그 동적 주입 / 갱신
+      let meta = document.querySelector('meta[name="viewport"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute('name', 'viewport');
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute(
+        'content',
+        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
+      );
+
+      // 2. 인풋 터치 시 자동 줌인 방지 (16px 강제 및 제스처 잠금)
+      const styleId = 'prevent-ios-zoom';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+          html, body {
+            touch-action: pan-x pan-y;
+            -webkit-text-size-adjust: 100%;
+          }
+          input, textarea, select {
+            font-size: 16px !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+
     // 웹 실행 시 브라우저 로드 완료 후 serviceWorker 안전 등록
     if (Platform.OS === 'web' && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then(
@@ -1196,7 +1228,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
                     // 2. 스토리지(AsyncStorage / localStorage)에 한 번에 영구 저장
                     try {
                       if (typeof AsyncStorage !== 'undefined') {
-                        await AsyncStorage.setItem('student_profiles', JSON.stringify(updated));
+                        await AsyncStorage.setItem('@profiles', JSON.stringify(updated));
                       } else if (typeof localStorage !== 'undefined') {
                         localStorage.setItem('student_profiles', JSON.stringify(updated));
                       }
