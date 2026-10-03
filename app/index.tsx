@@ -169,6 +169,21 @@ const handleEditProfile = (profile: Profile) => {
   const [customMedication, setCustomMedication] = useState<string>('');
   const [medicationLocation, setMedicationLocation] = useState<string>('');
 
+  // 🥜 알레르기 번호 -> 한글 이름 변환 맵핑
+  const ALLERGY_NAMES: { [key: string]: string } = {
+    '1': '난류', '2': '우유', '3': '메밀', '4': '땅콩', '5': '대두',
+    '6': '밀', '7': '고등어', '8': '게', '9': '새우', '10': '돼지고기',
+    '11': '복숭아', '12': '토마토', '13': '아황산류', '14': '호두',
+    '15': '닭고기', '16': '쇠고기', '17': '오징어', '18': '조개류', '19': '잣'
+  };
+
+  const formatAllergyNames = (allergies: any[]) => {
+    if (!allergies || !Array.isArray(allergies) || allergies.length === 0) return '등록된 알레르기 없음';
+    return allergies
+      .map((item) => ALLERGY_NAMES[String(item)] || String(item))
+      .join(', ');
+  };
+
   // 🍱 식판 메뉴 자동 분류 함수 (밥, 국, 반찬 6칸)
 function categorizeMealsToTray(mealItems: any[]) {
   let rice: any = null;
@@ -777,7 +792,9 @@ function MealTrayView({ meals }: { meals: any[] }) {
       {/* 1. 프로필 선택 영역 */}
     <View style={styles.card}>
       <View style={styles.cardHeaderRow}>
-        <Text style={styles.sectionTitle}>👤 학생/자녀 프로필 선택</Text>
+        <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#2c3e50', flexShrink: 1 }} numberOfLines={1}>
+  👤 학생/자녀 프로필 선택
+</Text>
         
        {/* 우측 상단: 프로필 관리 & 요약정리 버튼 */}
         <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
@@ -974,11 +991,11 @@ function MealTrayView({ meals }: { meals: any[] }) {
 
               <View style={{ gap: 10 }}>
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#e67e22' }}>⚠️ 보유 알레르기</Text>
-                  <Text style={{ fontSize: 13, color: '#333', marginTop: 3 }}>
-                    {allergiesList}
-                  </Text>
-                </View>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#e67e22' }}>⚠️ 보유 알레르기</Text>
+                <Text style={{ fontSize: 13, color: '#333', marginTop: 3 }}>
+                  {formatAllergyNames(targetProf.myAllergies || targetProf.allergies)}
+                </Text>
+              </View>
 
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#e74c3c' }}>🚨 주요 나타나는 증상</Text>
