@@ -17,7 +17,7 @@ import {
   useWindowDimensions
 } from 'react-native';
 
-const CURRENT_APP_VERSION = '1.0.7';
+const CURRENT_APP_VERSION = '1.0.1';
 const VAPID_PUBLIC_KEY = 'BIMm5K3reoqNavT0h6W4vRHNWIUs0Dl9r6gPKxeD15gVwm58TIt2v_U4CH1Q0E_4h1QZGbfkhEX9eDJafd1_ivY';
 
 // base64 문자열을 Uint8Array로 변환하는 헬퍼 함수
@@ -645,7 +645,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
             } else {
               setTimeout(() => {
                 new Notification('🧪 테스트 알림 (로컬)', {
-                  body: '급식 알레르기 체커 테스트 알림입니다.',
+                  body: '급식 닥터 (알러지 & 영양) 테스트 알림입니다.',
                 });
               }, 3000);
               Alert.alert('안내', '백엔드 서버 미응답으로 로컬 알림이 3초 뒤 동작합니다.');
@@ -653,7 +653,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
           } catch (e) {
             setTimeout(() => {
               new Notification('🧪 테스트 알림 (로컬)', {
-                body: '급식 알레르기 체커 테스트 알림입니다.',
+                body: '급식 닥터 (알러지 & 영양) 테스트 알림입니다.',
               });
             }, 3000);
             Alert.alert('안내', '로컬 테스트 알림이 3초 뒤에 표시됩니다.');
@@ -898,7 +898,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
 >
       {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>🥗 급식 알레르기 체커</Text>
+        <Text style={styles.headerTitle}>🧑‍⚕️️ 급식 닥터 (알러지 & 영양)</Text>
         <Text style={styles.versionText}>v{CURRENT_APP_VERSION}</Text>
       </View>
 
@@ -2080,7 +2080,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
       {/* 앱 정보 푸터 */}
         <View style={{ marginTop: 30, paddingVertical: 20, borderTopWidth: 1, borderTopColor: '#eee', alignItems: 'center' }}>
           <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#666', marginBottom: 4 }}>
-            학생 알레르기 & 비상약 관리 시스템 v1.0.7
+            학생 알레르기 & 영양 관리 시스템 v1.0.1
           </Text>
           <Text style={{ fontSize: 12, color: '#888', marginBottom: 2 }}>
             기획 및 개발: 김도형, 나승호
