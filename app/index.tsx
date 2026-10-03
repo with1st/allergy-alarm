@@ -1111,22 +1111,29 @@ function MealTrayView({ meals }: { meals: any[] }) {
 
             <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
               {(() => {
+                // 식판과 동일한 알레르기 판별 함수 (번호 & 이름 양방향 매칭)
+                const isAllergyMatch = (dishAllergies: any[], userAllergies: any[]) => {
+                  if (!Array.isArray(dishAllergies) || !Array.isArray(userAllergies)) return false;
+                  return dishAllergies.some((dishItem: any) => {
+                    const dishStr = String(dishItem).trim();
+                    return userAllergies.some((userItem: any) => {
+                      const userStr = String(userItem).trim();
+                      const userName = (typeof ALLERGY_NAMES !== 'undefined' ? ALLERGY_NAMES[userStr] : '') || userStr;
+                      return (
+                        dishStr === userStr ||
+                        dishStr.includes(userName) ||
+                        dishStr.includes(userStr)
+                      );
+                    });
+                  });
+                };
+
                 const dangerReports = (profiles || [])
                   .map((prof: any) => {
+                    const userAllergies = prof?.myAllergies || prof?.allergies || [];
                     const dangerDishes = ((meals as any) || []).filter((dish: any) => {
                       const dishAllergies = dish?.allergies || [];
-                      const userAllergies = prof?.myAllergies || prof?.allergies || [];
-                      return (
-                        Array.isArray(dishAllergies) &&
-                        dishAllergies.some((a: any) =>
-                          Array.isArray(userAllergies) &&
-                          userAllergies.some(
-                            (u: any) =>
-                              String(u) === String(a) ||
-                              (typeof a === 'string' && a.includes(String(u)))
-                          )
-                        )
-                      );
+                      return isAllergyMatch(dishAllergies, userAllergies);
                     });
                     return { profile: prof, dangerDishes };
                   })
