@@ -622,52 +622,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
     }
   };
 
-  const triggerTestNotification = async () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if ('Notification' in window) {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          // 서버 발송 전 구독 정보 최신화
-          await subscribeToPush();
-          try {
-            const res = await fetch('https://allergy-alarm.onrender.com/send-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: '🧪 테스트 푸시 알림',
-                body: '3초 후 전송된 급식 알레르기 서버 푸시 테스트입니다!',
-                delay: 3000,
-              }),
-            });
-
-            if (res.ok) {
-              Alert.alert('요청 완료', '3초 후 실제 푸시 알림이 발송됩니다.');
-            } else {
-              setTimeout(() => {
-                new Notification('🧪 테스트 알림 (로컬)', {
-                  body: '급식 닥터 (알러지 & 영양) 테스트 알림입니다.',
-                });
-              }, 3000);
-              Alert.alert('안내', '백엔드 서버 미응답으로 로컬 알림이 3초 뒤 동작합니다.');
-            }
-          } catch (e) {
-            setTimeout(() => {
-              new Notification('🧪 테스트 알림 (로컬)', {
-                body: '급식 닥터 (알러지 & 영양) 테스트 알림입니다.',
-              });
-            }, 3000);
-            Alert.alert('안내', '로컬 테스트 알림이 3초 뒤에 표시됩니다.');
-          }
-        } else {
-          Alert.alert('권한 필요', '브라우저 알림 권한을 허용해 주세요.');
-        }
-      } else {
-        Alert.alert('알림 미지원', '이 브라우저는 웹 알림을 지원하지 않습니다.');
-      }
-    } else {
-      Alert.alert('테스트 알림', '3초 후 테스트 알림이 발송됩니다.');
-    }
-  };
+  
 
   const currentProfile = profiles.find((p) => p.id === currentProfileId);
 
