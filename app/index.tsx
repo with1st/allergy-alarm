@@ -622,7 +622,75 @@ function MealTrayView({ meals }: { meals: any[] }) {
     }
   };
 
-  
+  const triggerTestNotification = async () => {
+    // 1. 등록된 모든 학생에 대해 오늘 식단 대조 및 위험 요약 생성
+    const riskSummaries: string[] = [];
+
+    (profiles || []).forEach((prof: any) => {
+      const userAllergies: string[] = prof.myAllergies || prof.allergies || [];
+      if (userAllergies.length === 0) return;
+
+      const dangerDishes: string[] = [];
+      meals.forEach((m: any) => {
+        const dishAllergies: string[] = m.allergies || [];
+        const hasRisk = dishAllergies.some((alg) => userAllergies.includes(alg));
+        if (hasRisk) {
+          dangerDishes.push(m.dishName || m.dish || '메뉴');
+        }
+      });
+
+      if (dangerDishes.length > 0) {
+        riskSummaries.push(`${prof.name}(${dangerDishes.slice(0, 2).join(', ')})`);
+      }
+    });
+
+    // 2. 위험 학생 유무에 따른 제목 및 본문 분기
+    let notifTitle = '';
+    let notifBody = '';
+
+    if (riskSummaries.length > 0) {
+      notifTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
+      notifBody = `${riskSummaries.join(' / ')} 학생의 주의 식단이 있습니다. 앱에서 비상약 및 대처법을 확인하세요.`;
+    } else {
+      notifTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
+      notifBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다. 즐거운 식사 시간 되세요!';
+    }
+
+    // 3. 웹 및 앱 알림 발송
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if ('Notification' in window) {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          await subscribeToPush();
+          try {
+            const res = await fetch('https://allergy-alarm.onrender.com/send-notification', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                title: notifTitle,
+                body: notifBody,
+                delay: 1000,
+              }),
+            });
+
+            if (res.ok) {
+              Alert.alert('알림 전송', '푸시 알림이 발송되었습니다.');
+            } else {
+              new Notification(notifTitle, { body: notifBody });
+            }
+          } catch (e) {
+            new Notification(notifTitle, { body: notifBody });
+          }
+        } else {
+          Alert.alert('권한 필요', '브라우저 알림 권한을 허용해 주세요.');
+        }
+      } else {
+        Alert.alert('알림 미지원', '이 브라우저는 웹 알림을 지원하지 않습니다.');
+      }
+    } else {
+      Alert.alert(notifTitle, notifBody);
+    }
+  };
 
   const currentProfile = profiles.find((p) => p.id === currentProfileId);
 
