@@ -1,115 +1,96 @@
 const express = require('express');
 const webpush = require('web-push');
 const cors = require('cors');
-const cron = require('node-cron');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const publicVapidKey = 'BIMm5K3reoqNavT0h6W4vRHNWIUs0Dl9r6gPKxeD15gVwm58TIt2v_U4CH1Q0E_4h1QZGbfkhEX9eDJafd1_ivY';
-const privateVapidKey = 'f7RH78HkYLeZ7rZMOqHnkeJ08LoYEvURgidZOZqp2JA';
+// VAPID 키 설정 (사용 중이신 기존 키를 그대로 넣어주세요)
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || '여기에_기존_PUBLIC_KEY';
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || '여기에_기존_PRIVATE_KEY';
 
 webpush.setVapidDetails(
-  'mailto:example@yourdomain.org',
+  'mailto:example@yourdomain.com',
   publicVapidKey,
   privateVapidKey
 );
 
-let subscriptions = [];
-let userNotifSettings = {
-  enabled: false,
-  time: '07:40',
-  title: '✅ [급식 닥터] 오늘의 안심 식단 안내',
-  body: '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.',
-};
+// 다중 사용자 구독 및 알림 설정 목록
+// 각 항목 형태: { subscription, time: '08:00', enabled: true, title: '...', body: '...' }
+let userSubscriptions = [];
 
-// 구독 등록 API
-app.post('/subscribe', (req, res) => {
-  const subscription = req.body;
-  subscriptions = subscriptions.filter(sub => sub.endpoint !== subscription.endpoint);
-  subscriptions.push(subscription);
-  console.log(`✅ 새 알림 구독 등록 완료. 현재 구독 수: ${subscriptions.length}`);
-  res.status(201).json({});
-});
-
-// 알림 설정 API
+// 1. 기기 구독 등록 및 설정 저장 (/subscribe 또는 /set-time 통합 지원)
 app.post('/set-time', (req, res) => {
-  const { enabled, time, title, body } = req.body;
-  userNotifSettings.enabled = enabled;
-  userNotifSettings.time = time;
-  if (title) userNotifSettings.title = title;
-  if (body) userNotifSettings.body = body;
-  console.log(`⏰ 알림 설정 변경: Enabled=${enabled}, Time=${time}, Title=${title}`);
-  res.status(200).json({ message: '알림 설정 완료' });
-});
+  const { subscription, enabled, time, title, body } = req.body;
 
-// 테스트 알림 API
-app.post('/send-notification', (req, res) => {
-  const { title, body, delay } = req.body;
-  const payload = JSON.stringify({ title, body });
-
-  console.log(`⏰ ${delay / 1000}초 뒤 알림 전송 예약...`);
-  setTimeout(() => {
-    sendPushToAll(payload);
-  }, delay || 0);
-
-  res.status(200).json({ message: '알림 전송 예약됨' });
-});
-
-// 프로필 삭제 API
-app.post('/delete-profile', (req, res) => {
-  const { id } = req.body;
-  if (!id) {
-    return res.status(400).json({ success: false, message: '프로필 ID가 필요합니다.' });
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ error: 'subscription 정보가 필요합니다.' });
   }
-  if (typeof subscriptions !== 'undefined') {
-    subscriptions = subscriptions.filter(sub => sub.id !== id);
+
+  // 기존에 등록된 기기인지 확인
+  const index = userSubscriptions.findIndex(
+    item => item.subscription.endpoint === subscription.endpoint
+  );
+
+  const newSetting = {
+    subscription,
+    enabled: enabled !== undefined ? enabled : true,
+    time: time || '08:00',
+    title: title || '⚠️ [급식 닥터] 알레르기 주의 식단 안내',
+    body: body || '오늘의 알레르기 주의 식단을 확인하세요.'
+  };
+
+  if (index !== -1) {
+    // 이미 존재하는 기기는 해당 기기의 설정만 갱신
+    userSubscriptions[index] = newSetting;
+  } else {
+    // 새로운 기기는 목록에 추가
+    userSubscriptions.push(newSetting);
   }
-  console.log(`🗑️ 프로필 삭제 완료: ID ${id}`);
-  return res.status(200).json({ success: true, message: '프로필이 성공적으로 삭제되었습니다.' });
+
+  console.log(`[설정 저장] 총 등록 기기 수: ${userSubscriptions.length}, 설정 시간: ${newSetting.time}`);
+  res.status(200).json({ success: true, count: userSubscriptions.length });
 });
 
-// 푸시 일괄 발송 함수
-function sendPushToAll(payload) {
-  subscriptions.forEach((sub, index) => {
-    webpush.sendNotification(sub, payload).catch(err => {
-      console.error(`❌ [구독 ${index}] 발송 실패:`, err.message);
-      if (err.statusCode === 410 || err.statusCode === 404) {
-        subscriptions = subscriptions.filter(s => s.endpoint !== sub.endpoint);
-      }
-    });
-  });
-}
+// 2. 1분마다 현재 시간(KST)을 체크하여 각 사용자별로 알림 발송
+setInterval(() => {
+  if (userSubscriptions.length === 0) return;
 
-// 매 분 00초마다 실행되는 정밀 스케줄러 (한국 시간 기준)
-cron.schedule('* * * * *', () => {
-  if (!userNotifSettings.enabled) return;
-
+  // 한국 표준시 (KST, UTC+9) 구하기
   const now = new Date();
-  const koreanTime = new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  }).format(now);
+  const kstHours = String((now.getUTCHours() + 9) % 24).padStart(2, '0');
+  const kstMinutes = String(now.getUTCMinutes()).padStart(2, '0');
+  const currentTimeStr = `${kstHours}:${kstMinutes}`;
 
-  const [hour, minute] = koreanTime.split(':');
-  const currentTime = `${hour.trim()}:${minute.trim()}`;
+  // 현재 시간이 알림 시간과 일치하고 활성화된 사용자만 추출
+  const targets = userSubscriptions.filter(
+    item => item.enabled && item.time === currentTimeStr
+  );
 
-  if (currentTime === userNotifSettings.time) {
-    console.log(`🔔 설정한 시각(${currentTime})이 되어 급식 알림을 발송합니다!`);
+  if (targets.length > 0) {
+    console.log(`[알림 발송] ${currentTimeStr} 대상 기기 수: ${targets.length}`);
+  }
+
+  targets.forEach(item => {
     const payload = JSON.stringify({
-      title: userNotifSettings.title || '✅ [급식 닥터] 오늘의 안심 식단 안내',
-      body: userNotifSettings.body || '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.',
+      title: item.title,
+      body: item.body,
+      url: '/'
     });
 
-    sendPushToAll(payload);
-  }
-}, {
-  timezone: "Asia/Seoul"
-});
+    webpush.sendNotification(item.subscription, payload)
+      .catch(err => {
+        console.error('발송 실패 (만료된 구독 삭제 처리):', err.statusCode);
+        // 만료된 구독(410 Gone 또는 404)은 배열에서 제거
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          userSubscriptions = userSubscriptions.filter(
+            sub => sub.subscription.endpoint !== item.subscription.endpoint
+          );
+        }
+      });
+  });
+}, 60 * 1000);
 
-app.listen(5000, () => {
-  console.log('🚀 Server running on port 5000');
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
