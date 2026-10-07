@@ -625,20 +625,34 @@ function MealTrayView({ meals }: { meals: any[] }) {
       setSettingsModalVisible(false);
       Alert.alert('알림 설정', `매일 ${timeStr}에 급식 알림이 설정되었습니다.`);
 
-      // 4. Render 서버로 시간과 함께 '맞춤 문구'를 백그라운드 전송
-      if (Platform.OS === 'web') {
-        subscribeToPush().catch(() => {});
-        fetch('https://allergy-alarm.onrender.com/set-time', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            enabled: isNotificationEnabled,
-            time: timeStr,
-            title: dynamicTitle,
-            body: dynamicBody,
-          }),
-        }).catch((e) => console.log('서버 동기화 에러:', e));
-      }
+     // 4. Render 서버로 해당 기기의 구독 정보와 함께 시간/문구 전송
+    if (Platform.OS === 'web') {
+      (async () => {
+        try {
+          let sub: any = null;
+          if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+            const reg = await navigator.serviceWorker.ready;
+            sub = await (reg as any).pushManager.getSubscription();
+          }
+
+          if (sub) {
+            await fetch('https://allergy-alarm.onrender.com/set-time', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                subscription: sub,
+                enabled: isNotificationEnabled,
+                time: timeStr,
+                title: dynamicTitle,
+                body: dynamicBody,
+              }),
+            });
+          }
+        } catch (e) {
+          console.log('서버 동기화 에러:', e);
+        }
+      })();
+    }
     } catch (e) {
       Alert.alert('오류', '알림 설정을 저장하는데 실패했습니다.');
     }
