@@ -579,27 +579,27 @@ function MealTrayView({ meals }: { meals: any[] }) {
       await AsyncStorage.setItem('@notif_enabled', JSON.stringify(isNotificationEnabled));
       await AsyncStorage.setItem('@notif_time', timeStr);
 
-      if (Platform.OS === 'web') {
-        await subscribeToPush();
+      // 대기 시간 없이 즉시 모달을 닫고 완료 알림 표시
+      setSettingsModalVisible(false);
+      Alert.alert('알림 설정', `매일 ${timeStr}에 급식 알림이 설정되었습니다.`);
 
-        // 백엔드 서버로 설정된 알림 시간 전송
-        await fetch('https://allergy-alarm.onrender.com/set-time', {
+      // 서버 동기화는 백그라운드에서 비동기로 전송 (첫 클릭 딜레이 제거)
+      if (Platform.OS === 'web') {
+        subscribeToPush().catch(() => {});
+        fetch('https://allergy-alarm.onrender.com/set-time', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             enabled: isNotificationEnabled,
             time: timeStr,
           }),
-        });
+        }).catch((e) => console.log('서버 동기화 백그라운드 처리:', e));
       }
-
-      Alert.alert('알림 설정', `매일 ${timeStr}에 급식 알림이 설정되었습니다.`);
-      setSettingsModalVisible(false);
     } catch (e) {
       Alert.alert('오류', '알림 설정을 저장하는데 실패했습니다.');
     }
   };
-
+  
   const subscribeToPush = async () => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
       try {
@@ -623,72 +623,72 @@ function MealTrayView({ meals }: { meals: any[] }) {
   };
 
   const triggerTestNotification = async () => {
-    // 1. 등록된 모든 학생에 대해 오늘 식단 대조 및 위험 요약 생성
-    const riskSummaries: string[] = [];
+    try {
+      // 1. 등록된 모든 학생에 대해 오늘 식단 대조 및 위험 요약 생성
+      const riskSummaries: string[] = [];
 
-    (profiles || []).forEach((prof: any) => {
-      const userAllergies: string[] = prof.myAllergies || prof.allergies || [];
-      if (userAllergies.length === 0) return;
+      (profiles || []).forEach((prof: any) => {
+        // 프로필에 저장된 알레르기 목록 (숫자 또는 문자열)
+        const userAllergies: (number | string)[] = prof?.myAllergies || prof?.allergies || [];
+        if (!userAllergies || userAllergies.length === 0) return;
 
-      const dangerDishes: string[] = [];
-      meals.forEach((m: any) => {
-        const dishAllergies: string[] = m.allergies || [];
-        const hasRisk = dishAllergies.some((alg) => userAllergies.includes(alg));
-        if (hasRisk) {
-          dangerDishes.push(m.dishName || m.dish || '메뉴');
+        const dangerDishes: string[] = [];
+        (meals || []).forEach((m: any) => {
+          // 식단의 알레르기 이름과 번호 목록
+          const dishAlgNames: string[] = m?.allergies || [];
+          const dishAlgNums: number[] = m?.allergyNums || [];
+
+          // 숫자 매칭 or 이름 매칭 둘 다 검사
+          const hasRisk = userAllergies.some((alg: any) => {
+            if (typeof alg === 'number') {
+              return dishAlgNums.includes(alg);
+            } else {
+              return dishAlgNames.includes(alg);
+            }
+          });
+
+          if (hasRisk) {
+            dangerDishes.push(m?.dishName || m?.dish || '메뉴');
+          }
+        });
+
+        if (dangerDishes.length > 0) {
+          // 중복 반찬 제거 후 최대 2개 표기
+          const uniqueDishes = Array.from(new Set(dangerDishes));
+          riskSummaries.push(`${prof?.name || '학생'}(${uniqueDishes.slice(0, 2).join(', ')})`);
         }
       });
 
-      if (dangerDishes.length > 0) {
-        riskSummaries.push(`${prof.name}(${dangerDishes.slice(0, 2).join(', ')})`);
+      // 2. 위험 학생 유무에 따른 알림 문구 분기
+      let notifTitle = '';
+      let notifBody = '';
+
+      if (riskSummaries.length > 0) {
+        notifTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
+        notifBody = `${riskSummaries.join(' / ')} 학생의 주의 식단이 있습니다. 앱에서 확인하세요.`;
+      } else {
+        notifTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
+        notifBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.';
       }
-    });
 
-    // 2. 위험 학생 유무에 따른 제목 및 본문 분기
-    let notifTitle = '';
-    let notifBody = '';
-
-    if (riskSummaries.length > 0) {
-      notifTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
-      notifBody = `${riskSummaries.join(' / ')} 학생의 주의 식단이 있습니다. 앱에서 비상약 및 대처법을 확인하세요.`;
-    } else {
-      notifTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
-      notifBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다. 즐거운 식사 시간 되세요!';
-    }
-
-    // 3. 웹 및 앱 알림 발송
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      if ('Notification' in window) {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          await subscribeToPush();
-          try {
-            const res = await fetch('https://allergy-alarm.onrender.com/send-notification', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: notifTitle,
-                body: notifBody,
-                delay: 1000,
-              }),
-            });
-
-            if (res.ok) {
-              Alert.alert('알림 전송', '푸시 알림이 발송되었습니다.');
-            } else {
-              new Notification(notifTitle, { body: notifBody });
-            }
-          } catch (e) {
-            new Notification(notifTitle, { body: notifBody });
+      // 3. 알림 발송 (웹 / 앱)
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && 'Notification' in window) {
+          const perm = await (window as any).Notification.requestPermission();
+          if (perm === 'granted') {
+            new (window as any).Notification(notifTitle, { body: notifBody });
+          } else {
+            Alert.alert('권한 필요', '브라우저 알림 권한을 허용해 주세요.');
           }
         } else {
-          Alert.alert('권한 필요', '브라우저 알림 권한을 허용해 주세요.');
+          Alert.alert(notifTitle, notifBody);
         }
       } else {
-        Alert.alert('알림 미지원', '이 브라우저는 웹 알림을 지원하지 않습니다.');
+        Alert.alert(notifTitle, notifBody);
       }
-    } else {
-      Alert.alert(notifTitle, notifBody);
+    } catch (error) {
+      console.log('알림 에러:', error);
+      Alert.alert('안내', '알림 확인 중 오류가 발생했습니다.');
     }
   };
 
