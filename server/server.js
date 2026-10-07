@@ -6,8 +6,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'BIMm5K3reoqNavT0h6W4vRHNWIUs0Dl9r6gPKxeD15gVwm58TIt2v_U4CH1Q0E_4h1QZGbfkhEX9eDJafd1_ivY';
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'f7RH78HkYLeZ7rZMOqHnkeJ08LoYEvURgidZOZqp2JA';
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'YOUR_PUBLIC_VAPID_KEY';
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'YOUR_PRIVATE_VAPID_KEY';
 
 webpush.setVapidDetails(
   'mailto:example@yourdomain.com',
