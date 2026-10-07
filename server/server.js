@@ -20,6 +20,8 @@ let subscriptions = [];
 let userNotifSettings = {
   enabled: false,
   time: '07:40',
+  title: '✅ [급식 닥터] 오늘의 안심 식단 안내',
+  body: '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.',
 };
 
 // 구독 등록 API
@@ -31,12 +33,14 @@ app.post('/subscribe', (req, res) => {
   res.status(201).json({});
 });
 
-// 알림 시간 설정 API
+// 알림 설정 API
 app.post('/set-time', (req, res) => {
-  const { enabled, time } = req.body;
+  const { enabled, time, title, body } = req.body;
   userNotifSettings.enabled = enabled;
   userNotifSettings.time = time;
-  console.log(`⏰ 알림 설정 변경: Enabled=${enabled}, Time=${time}`);
+  if (title) userNotifSettings.title = title;
+  if (body) userNotifSettings.body = body;
+  console.log(`⏰ 알림 설정 변경: Enabled=${enabled}, Time=${time}, Title=${title}`);
   res.status(200).json({ message: '알림 설정 완료' });
 });
 
@@ -44,23 +48,6 @@ app.post('/set-time', (req, res) => {
 app.post('/send-notification', (req, res) => {
   const { title, body, delay } = req.body;
   const payload = JSON.stringify({ title, body });
-
-  // 프로필 삭제 API
-app.post('/delete-profile', (req, res) => {
-  const { id } = req.body;
-
-  if (!id) {
-    return res.status(400).json({ success: false, message: '프로필 ID가 필요합니다.' });
-  }
-
-  // 서버에 저장된 구독 정보 중 해당 프로필 ID 제거
-  if (typeof subscriptions !== 'undefined') {
-    subscriptions = subscriptions.filter(sub => sub.id !== id);
-  }
-
-  console.log(`🗑️ 프로필 삭제 완료: ID ${id}`);
-  return res.status(200).json({ success: true, message: '프로필이 성공적으로 삭제되었습니다.' });
-});
 
   console.log(`⏰ ${delay / 1000}초 뒤 알림 전송 예약...`);
   setTimeout(() => {
@@ -70,7 +57,20 @@ app.post('/delete-profile', (req, res) => {
   res.status(200).json({ message: '알림 전송 예약됨' });
 });
 
-// 푸시 일괄 발송 및 만료된 구독 자동 삭제 함수
+// 프로필 삭제 API
+app.post('/delete-profile', (req, res) => {
+  const { id } = req.body;
+  if (!id) {
+    return res.status(400).json({ success: false, message: '프로필 ID가 필요합니다.' });
+  }
+  if (typeof subscriptions !== 'undefined') {
+    subscriptions = subscriptions.filter(sub => sub.id !== id);
+  }
+  console.log(`🗑️ 프로필 삭제 완료: ID ${id}`);
+  return res.status(200).json({ success: true, message: '프로필이 성공적으로 삭제되었습니다.' });
+});
+
+// 푸시 일괄 발송 함수
 function sendPushToAll(payload) {
   subscriptions.forEach((sub, index) => {
     webpush.sendNotification(sub, payload).catch(err => {
@@ -100,8 +100,8 @@ cron.schedule('* * * * *', () => {
   if (currentTime === userNotifSettings.time) {
     console.log(`🔔 설정한 시각(${currentTime})이 되어 급식 알림을 발송합니다!`);
     const payload = JSON.stringify({
-      title: '🥗 오늘의 급식 알레르기 안내',
-      body: '오늘 학생들의 급식에 알레르기 유발 메뉴가 있는지 확인하세요!',
+      title: userNotifSettings.title || '✅ [급식 닥터] 오늘의 안심 식단 안내',
+      body: userNotifSettings.body || '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.',
     });
 
     sendPushToAll(payload);
