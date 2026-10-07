@@ -7,8 +7,8 @@ app.use(cors());
 app.use(express.json());
 
 // VAPID 키 설정 (사용 중이신 기존 키를 그대로 넣어주세요)
-const publicVapidKey = process.env.VAPID_PUBLIC_KEY || '여기에_기존_PUBLIC_KEY';
-const privateVapidKey = process.env.VAPID_PRIVATE_KEY || '여기에_기존_PRIVATE_KEY';
+const publicVapidKey = process.env.VAPID_PUBLIC_KEY || 'BIMm5K3reoqNavT0h6W4vRHNWIUs0Dl9r6gPKxeD15gVwm58TIt2v_U4CH1Q0E_4h1QZGbfkhEX9eDJafd1_ivY';
+const privateVapidKey = process.env.VAPID_PRIVATE_KEY || 'f7RH78HkYLeZ7rZMOqHnkeJ08LoYEvURgidZOZqp2JA';
 
 webpush.setVapidDetails(
   'mailto:example@yourdomain.com',
