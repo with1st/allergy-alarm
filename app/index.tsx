@@ -615,7 +615,7 @@ function MealTrayView({ meals }: { meals: any[] }) {
 
       if (riskSummaries.length > 0) {
         dynamicTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
-        dynamicBody = `${riskSummaries.join(' / ')} 학생의 주의 식단이 있습니다. 앱에서 확인하세요.`;
+        dynamicBody = '오늘은 등록된 학생 중 알레르기 주의 식단이 있습니다. 앱에서 확인해 주세요.';
       } else {
         dynamicTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
         dynamicBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.';
@@ -702,12 +702,12 @@ function MealTrayView({ meals }: { meals: any[] }) {
       let notifBody = '';
 
       if (riskSummaries.length > 0) {
-        notifTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
-        notifBody = `${riskSummaries.join(' / ')} 학생의 주의 식단이 있습니다. 앱에서 확인하세요.`;
-      } else {
-        notifTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
-        notifBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.';
-      }
+      notifTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
+      notifBody = '오늘은 등록된 학생 중 알레르기 주의 식단이 있습니다. 앱에서 확인해 주세요.';
+    } else {
+      notifTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
+      notifBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.';
+    }
 
       // 3. 알림 발송 (웹 / 앱)
       if (Platform.OS === 'web') {
