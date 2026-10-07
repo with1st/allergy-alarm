@@ -582,23 +582,13 @@ function MealTrayView({ meals }: { meals: any[] }) {
       // 1. 등록된 모든 학생의 오늘 알레르기 위험 요약 생성
       const riskSummaries: string[] = [];
       (profiles || []).forEach((prof: any) => {
-        const userAllergies: (number | string)[] = prof?.myAllergies || prof?.allergies || [];
+        const userAllergies = prof?.myAllergies || prof?.allergies || [];
         if (!userAllergies || userAllergies.length === 0) return;
 
+        // 화면 식판과 동일한 방식: isDanger 메뉴 추출
         const dangerDishes: string[] = [];
         (meals || []).forEach((m: any) => {
-          const dishAlgNames: string[] = m?.allergies || [];
-          const dishAlgNums: number[] = m?.allergyNums || [];
-
-          const hasRisk = userAllergies.some((alg: any) => {
-            if (typeof alg === 'number') {
-              return dishAlgNums.includes(alg);
-            } else {
-              return dishAlgNames.includes(alg);
-            }
-          });
-
-          if (hasRisk) {
+          if (m?.isDanger) {
             dangerDishes.push(m?.dishName || m?.dish || '메뉴');
           }
         });
@@ -668,40 +658,25 @@ function MealTrayView({ meals }: { meals: any[] }) {
 
   const triggerTestNotification = async () => {
     try {
-      // 1. 등록된 모든 학생에 대해 오늘 식단 대조 및 위험 요약 생성
-      const riskSummaries: string[] = [];
+     // 1. 등록된 모든 학생에 대해 오늘 식단 대조 및 위험 요약 생성
+    const riskSummaries: string[] = [];
+    (profiles || []).forEach((prof: any) => {
+      const userAllergies = prof?.myAllergies || prof?.allergies || [];
+      if (!userAllergies || userAllergies.length === 0) return;
 
-      (profiles || []).forEach((prof: any) => {
-        // 프로필에 저장된 알레르기 목록 (숫자 또는 문자열)
-        const userAllergies: (number | string)[] = prof?.myAllergies || prof?.allergies || [];
-        if (!userAllergies || userAllergies.length === 0) return;
-
-        const dangerDishes: string[] = [];
-        (meals || []).forEach((m: any) => {
-          // 식단의 알레르기 이름과 번호 목록
-          const dishAlgNames: string[] = m?.allergies || [];
-          const dishAlgNums: number[] = m?.allergyNums || [];
-
-          // 숫자 매칭 or 이름 매칭 둘 다 검사
-          const hasRisk = userAllergies.some((alg: any) => {
-            if (typeof alg === 'number') {
-              return dishAlgNums.includes(alg);
-            } else {
-              return dishAlgNames.includes(alg);
-            }
-          });
-
-          if (hasRisk) {
-            dangerDishes.push(m?.dishName || m?.dish || '메뉴');
-          }
-        });
-
-        if (dangerDishes.length > 0) {
-          // 중복 반찬 제거 후 최대 2개 표기
-          const uniqueDishes = Array.from(new Set(dangerDishes));
-          riskSummaries.push(`${prof?.name || '학생'}(${uniqueDishes.slice(0, 2).join(', ')})`);
+      // 화면 식판과 동일한 방식: isDanger 메뉴 추출
+      const dangerDishes: string[] = [];
+      (meals || []).forEach((m: any) => {
+        if (m?.isDanger) {
+          dangerDishes.push(m?.dishName || m?.dish || '메뉴');
         }
       });
+
+      if (dangerDishes.length > 0) {
+        const uniqueDishes = Array.from(new Set(dangerDishes));
+        riskSummaries.push(`${prof?.name || '학생'}(${uniqueDishes.slice(0, 2).join(', ')})`);
+      }
+    });
 
       // 2. 위험 학생 유무에 따른 알림 문구 분기
       let notifTitle = '';
