@@ -579,16 +579,27 @@ function MealTrayView({ meals }: { meals: any[] }) {
       await AsyncStorage.setItem('@notif_enabled', JSON.stringify(isNotificationEnabled));
       await AsyncStorage.setItem('@notif_time', timeStr);
 
-      // 1. 등록된 모든 학생의 오늘 알레르기 위험 요약 생성
+      // 1. 등록된 모든 학생에 대해 각자의 알레르기와 오늘 급식 대조
       const riskSummaries: string[] = [];
+
       (profiles || []).forEach((prof: any) => {
         const userAllergies = prof?.myAllergies || prof?.allergies || [];
         if (!userAllergies || userAllergies.length === 0) return;
 
-        // 화면 식판과 동일한 방식: isDanger 메뉴 추출
         const dangerDishes: string[] = [];
         (meals || []).forEach((m: any) => {
-          if (m?.isDanger) {
+          const dishAlgNames: string[] = m?.allergies || [];
+          const dishAlgNums: number[] = m?.allergyNums || [];
+
+          // 학생 알레르기가 번호든 이름이든 대조
+          const hasRisk = userAllergies.some((alg: any) => {
+            if (typeof alg === 'number') {
+              return dishAlgNums.includes(alg);
+            }
+            return dishAlgNames.includes(alg);
+          });
+
+          if (hasRisk) {
             dangerDishes.push(m?.dishName || m?.dish || '메뉴');
           }
         });
@@ -658,16 +669,27 @@ function MealTrayView({ meals }: { meals: any[] }) {
 
   const triggerTestNotification = async () => {
     try {
-     // 1. 등록된 모든 학생에 대해 오늘 식단 대조 및 위험 요약 생성
+    // 1. 등록된 모든 학생에 대해 각자의 알레르기와 오늘 급식 대조
     const riskSummaries: string[] = [];
+
     (profiles || []).forEach((prof: any) => {
       const userAllergies = prof?.myAllergies || prof?.allergies || [];
       if (!userAllergies || userAllergies.length === 0) return;
 
-      // 화면 식판과 동일한 방식: isDanger 메뉴 추출
       const dangerDishes: string[] = [];
       (meals || []).forEach((m: any) => {
-        if (m?.isDanger) {
+        const dishAlgNames: string[] = m?.allergies || [];
+        const dishAlgNums: number[] = m?.allergyNums || [];
+
+        // 학생 알레르기가 번호든 이름이든 대조
+        const hasRisk = userAllergies.some((alg: any) => {
+          if (typeof alg === 'number') {
+            return dishAlgNums.includes(alg);
+          }
+          return dishAlgNames.includes(alg);
+        });
+
+        if (hasRisk) {
           dangerDishes.push(m?.dishName || m?.dish || '메뉴');
         }
       });
@@ -677,7 +699,6 @@ function MealTrayView({ meals }: { meals: any[] }) {
         riskSummaries.push(`${prof?.name || '학생'}(${uniqueDishes.slice(0, 2).join(', ')})`);
       }
     });
-
       // 2. 위험 학생 유무에 따른 알림 문구 분기
       let notifTitle = '';
       let notifBody = '';
