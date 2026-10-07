@@ -579,25 +579,24 @@ function MealTrayView({ meals }: { meals: any[] }) {
       await AsyncStorage.setItem('@notif_enabled', JSON.stringify(isNotificationEnabled));
       await AsyncStorage.setItem('@notif_time', timeStr);
 
-      // 1. 등록된 모든 학생에 대해 각자의 알레르기와 오늘 급식 대조
+     // 1. 등록된 모든 학생에 대해 각자의 알레르기와 오늘 급식 대조
       const riskSummaries: string[] = [];
 
       (profiles || []).forEach((prof: any) => {
-        const userAllergies = prof?.myAllergies || prof?.allergies || [];
-        if (!userAllergies || userAllergies.length === 0) return;
+        const userAllergyIds: any[] = prof?.myAllergies || prof?.allergies || [];
+        if (!userAllergyIds || userAllergyIds.length === 0) return;
+
+        // 학생이 가진 알레르기 한글 이름 목록 추출
+        const userAllergyNames: string[] = userAllergyIds
+          .map((id: any) => ALLERGY_LIST.find((a: any) => a.id === id)?.name)
+          .filter((name: any): name is string => Boolean(name));
 
         const dangerDishes: string[] = [];
         (meals || []).forEach((m: any) => {
-          const dishAlgNames: string[] = m?.allergies || [];
-          const dishAlgNums: number[] = m?.allergyNums || [];
-
-          // 학생 알레르기가 번호든 이름이든 대조
-          const hasRisk = userAllergies.some((alg: any) => {
-            if (typeof alg === 'number') {
-              return dishAlgNums.includes(alg);
-            }
-            return dishAlgNames.includes(alg);
-          });
+          const dishAllergies: string[] = m?.allergies || [];
+          
+          // 반찬 알레르기에 학생 알레르기가 포함되어 있는지 검사
+          const hasRisk = userAllergyNames.some((name) => dishAllergies.includes(name));
 
           if (hasRisk) {
             dangerDishes.push(m?.dishName || m?.dish || '메뉴');
@@ -673,21 +672,20 @@ function MealTrayView({ meals }: { meals: any[] }) {
     const riskSummaries: string[] = [];
 
     (profiles || []).forEach((prof: any) => {
-      const userAllergies = prof?.myAllergies || prof?.allergies || [];
-      if (!userAllergies || userAllergies.length === 0) return;
+      const userAllergyIds: any[] = prof?.myAllergies || prof?.allergies || [];
+      if (!userAllergyIds || userAllergyIds.length === 0) return;
+
+      // 학생이 가진 알레르기 한글 이름 목록 추출
+      const userAllergyNames: string[] = userAllergyIds
+        .map((id: any) => ALLERGY_LIST.find((a: any) => a.id === id)?.name)
+        .filter((name: any): name is string => Boolean(name));
 
       const dangerDishes: string[] = [];
       (meals || []).forEach((m: any) => {
-        const dishAlgNames: string[] = m?.allergies || [];
-        const dishAlgNums: number[] = m?.allergyNums || [];
-
-        // 학생 알레르기가 번호든 이름이든 대조
-        const hasRisk = userAllergies.some((alg: any) => {
-          if (typeof alg === 'number') {
-            return dishAlgNums.includes(alg);
-          }
-          return dishAlgNames.includes(alg);
-        });
+        const dishAllergies: string[] = m?.allergies || [];
+        
+        // 반찬 알레르기에 학생 알레르기가 포함되어 있는지 검사
+        const hasRisk = userAllergyNames.some((name) => dishAllergies.includes(name));
 
         if (hasRisk) {
           dangerDishes.push(m?.dishName || m?.dish || '메뉴');
