@@ -579,11 +579,53 @@ function MealTrayView({ meals }: { meals: any[] }) {
       await AsyncStorage.setItem('@notif_enabled', JSON.stringify(isNotificationEnabled));
       await AsyncStorage.setItem('@notif_time', timeStr);
 
-      // 대기 시간 없이 즉시 모달을 닫고 완료 알림 표시
+      // 1. 등록된 모든 학생의 오늘 알레르기 위험 요약 생성
+      const riskSummaries: string[] = [];
+      (profiles || []).forEach((prof: any) => {
+        const userAllergies: (number | string)[] = prof?.myAllergies || prof?.allergies || [];
+        if (!userAllergies || userAllergies.length === 0) return;
+
+        const dangerDishes: string[] = [];
+        (meals || []).forEach((m: any) => {
+          const dishAlgNames: string[] = m?.allergies || [];
+          const dishAlgNums: number[] = m?.allergyNums || [];
+
+          const hasRisk = userAllergies.some((alg: any) => {
+            if (typeof alg === 'number') {
+              return dishAlgNums.includes(alg);
+            } else {
+              return dishAlgNames.includes(alg);
+            }
+          });
+
+          if (hasRisk) {
+            dangerDishes.push(m?.dishName || m?.dish || '메뉴');
+          }
+        });
+
+        if (dangerDishes.length > 0) {
+          const uniqueDishes = Array.from(new Set(dangerDishes));
+          riskSummaries.push(`${prof?.name || '학생'}(${uniqueDishes.slice(0, 2).join(', ')})`);
+        }
+      });
+
+      // 2. 위험 학생 유무에 따른 제목 및 본문 확정
+      let dynamicTitle = '';
+      let dynamicBody = '';
+
+      if (riskSummaries.length > 0) {
+        dynamicTitle = '⚠️ [급식 닥터] 오늘 알레르기 주의 식단 감지!';
+        dynamicBody = `${riskSummaries.join(' / ')} 학생의 주의 식단이 있습니다. 앱에서 확인하세요.`;
+      } else {
+        dynamicTitle = '✅ [급식 닥터] 오늘의 안심 식단 안내';
+        dynamicBody = '오늘은 등록된 학생 전원 알레르기 안심 식단입니다.';
+      }
+
+      // 3. 앱 화면 즉시 닫기 (딜레이 방지)
       setSettingsModalVisible(false);
       Alert.alert('알림 설정', `매일 ${timeStr}에 급식 알림이 설정되었습니다.`);
 
-      // 서버 동기화는 백그라운드에서 비동기로 전송 (첫 클릭 딜레이 제거)
+      // 4. Render 서버로 시간과 함께 '맞춤 문구'를 백그라운드 전송
       if (Platform.OS === 'web') {
         subscribeToPush().catch(() => {});
         fetch('https://allergy-alarm.onrender.com/set-time', {
@@ -592,14 +634,16 @@ function MealTrayView({ meals }: { meals: any[] }) {
           body: JSON.stringify({
             enabled: isNotificationEnabled,
             time: timeStr,
+            title: dynamicTitle,
+            body: dynamicBody,
           }),
-        }).catch((e) => console.log('서버 동기화 백그라운드 처리:', e));
+        }).catch((e) => console.log('서버 동기화 에러:', e));
       }
     } catch (e) {
       Alert.alert('오류', '알림 설정을 저장하는데 실패했습니다.');
     }
   };
-  
+
   const subscribeToPush = async () => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
       try {
